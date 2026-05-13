@@ -6,16 +6,15 @@ import './index.css'
 // === BARIS AJAIB: MENGHIDUPKAN MESIN PWA ===
 import { registerSW } from 'virtual:pwa-register'
 
-// Nyalakan Service Worker dan otomatis update jika ada kode baru
-const updateSW = registerSW({
+// Langsung eksekusi fungsinya, JANGAN pakai const updateSW =
+registerSW({
   onNeedRefresh() {
-    // Opsional: Bisa tampilkan toast "Ada update baru, refresh halaman!"
     console.log("PWA Update Ready!");
   },
   onOfflineReady() {
     console.log("PWA Ready to work offline!");
   },
-})
+});
 // ===========================================
 
 ReactDOM.createRoot(document.getElementById('root')).render(
