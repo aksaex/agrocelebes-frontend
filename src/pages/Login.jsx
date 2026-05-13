@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, LogIn, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Mail, Lock, LogIn, ShieldCheck, ArrowRight, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast'; 
 
 export default function Login() {
@@ -9,6 +9,28 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // State untuk menangkap event instalasi PWA
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+
+  useEffect(() => {
+    // Menangkap sinyal "Siap Install" dari sistem operasi (Chrome/Android)
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        toast.success('Terima kasih telah menginstal AgroCelebes!', { duration: 3000 });
+      }
+      setDeferredPrompt(null);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,7 +43,6 @@ export default function Login() {
       
       toast.success(`Selamat datang kembali, ${response.data.user.nama}!`);
       
-      // PENGALIHAN PINTAR BERBASIS PERAN (ROLE)
       if (response.data.user.role === 'admin') {
         navigate('/admin');
       } else {
@@ -38,17 +59,36 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans overflow-hidden">
       
-      {/* Container Utama: Mengikuti gaya Register.jsx (max-w-4xl) */}
       <div className="bg-white p-6 md:p-10 rounded-[2rem] shadow-2xl w-full max-w-4xl border border-gray-100 flex flex-col md:flex-row gap-8 lg:gap-16 items-center">
         
-        {/* SISI KIRI: Branding & Sambutan */}
-        <div className="w-full md:w-1/2 text-center md:text-left flex flex-col items-center md:items-start">
-          <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-green-100">
+        {/* SISI KIRI: Branding, Sambutan & TOMBOL UNDUH */}
+        <div className="w-full md:w-1/2 text-center md:text-left flex flex-col items-center md:items-start relative">
+          <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-green-100 relative">
             <ShieldCheck className="text-primary" size={36} />
+            
+            {/* Animasi Ping kecil jika bisa diinstall (opsional untuk menarik perhatian) */}
+            {deferredPrompt && (
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+              </span>
+            )}
           </div>
+          
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-3 leading-tight">Selamat Datang<br/>Kembali</h2>
           <p className="text-gray-500 text-sm mb-6">Masuk ke akun AgroCelebes Anda untuk mengelola komoditas dan memantau pasar B2B.</p>
           
+          {/* TOMBOL UNDUH APLIKASI (Hanya muncul jika di browser & belum diinstal) */}
+          {deferredPrompt && (
+            <button 
+              onClick={handleInstallClick}
+              className="mb-8 w-full md:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-primary text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-green-500/30 hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+            >
+              <Smartphone size={20} />
+              Unduh Aplikasi AgroCelebes
+            </button>
+          )}
+
           <div className="hidden md:block w-16 h-1 bg-primary rounded-full mb-6"></div>
           
           <p className="hidden md:block text-sm text-gray-600 font-medium">
