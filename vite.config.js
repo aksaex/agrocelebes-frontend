@@ -31,10 +31,12 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // MESIN OFFLINE: Menyimpan semua kode web ke memori HP
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // TAMBAHKAN BARIS INI (Menaikkan limit jadi 15 MB)
+        maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
         
         runtimeCaching: [
+          // ... (kode runtimeCaching Anda biarkan sama) ...
           // Strategi Offline untuk Data API Backend (Pasar B2B)
           {
             urlPattern: /^https:\/\/agrocelebes-backend\.vercel\.app\/api\/.*/i,
