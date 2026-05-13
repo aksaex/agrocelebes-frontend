@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto', // AJAIB: Ini yang memastikan Service Worker terdaftar otomatis
       includeAssets: ['logo.png', 'sawah.png', 'aksa.png'], // File yang didownload diam-diam untuk offline
       manifest: {
         name: 'AgroCelebes',
