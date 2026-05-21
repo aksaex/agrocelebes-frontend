@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Save, ImagePlus, MapPin, Store, Edit } from 'lucide-react';
+import { ArrowLeft, Save, ImagePlus, MapPin, Store, Edit, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function EditProduct() {
@@ -9,11 +9,12 @@ export default function EditProduct() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocating, setIsLocating] = useState(false); 
+  const [lokasiBaruDidapat, setLokasiBaruDidapat] = useState(false); 
   
   const [editImage, setEditImage] = useState(null);
   const [previewLama, setPreviewLama] = useState(null);
   
-  // 1. TAMBAH 'kategori' ke dalam State
   const [editData, setEditData] = useState({
     nama_komoditas: '', kategori: '', harga_per_kg: '', stok_kg: '', deskripsi: '', lokasi_lahan: ''
   });
@@ -31,7 +32,7 @@ export default function EditProduct() {
       });
       setEditData({
         nama_komoditas: res.data.nama_komoditas,
-        kategori: res.data.kategori || 'Lainnya', // 2. Load data kategori lama
+        kategori: res.data.kategori || 'Lainnya',
         harga_per_kg: res.data.harga_per_kg,
         stok_kg: res.data.stok_kg,
         deskripsi: res.data.deskripsi,
@@ -53,7 +54,7 @@ export default function EditProduct() {
     try {
       const formData = new FormData();
       formData.append('nama_komoditas', editData.nama_komoditas);
-      formData.append('kategori', editData.kategori); // 3. Kirim data kategori
+      formData.append('kategori', editData.kategori);
       formData.append('harga_per_kg', editData.harga_per_kg);
       formData.append('stok_kg', editData.stok_kg);
       formData.append('deskripsi', editData.deskripsi);
@@ -77,7 +78,9 @@ export default function EditProduct() {
 
   const dapatkanLokasiLahan = (e) => {
     e.preventDefault();
-    toast.loading("Melacak posisi satelit...", { id: 'gpsEdit' });
+    setIsLocating(true);
+    toast.loading("Melacak posisi satelit resolusi tinggi...", { id: 'gpsEdit' });
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(async (position) => {
         try {
@@ -85,21 +88,29 @@ export default function EditProduct() {
           const data = await res.json();
           if (data.display_name) {
             setEditData(prev => ({ ...prev, lokasi_lahan: data.display_name }));
-            toast.success("Lokasi otomatis didapatkan!", { id: 'gpsEdit' });
+            setLokasiBaruDidapat(true);
+            toast.success("Lokasi berhasil diperbarui!", { id: 'gpsEdit' });
           }
         } catch (error) {
           toast.error("Gagal memuat alamat otomatis.", { id: 'gpsEdit' });
+        } finally {
+          setIsLocating(false);
         }
-      });
+      }, () => {
+         toast.error("Gagal melacak. Pastikan GPS HP aktif.", { id: 'gpsEdit' });
+         setIsLocating(false);
+      }, 
+      // PERBAIKAN: Memaksa menggunakan GPS Satelit asli, bukan IP Internet
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
     } else {
       toast.error("Browser tidak mendukung GPS.", { id: 'gpsEdit' });
+      setIsLocating(false);
     }
   };
 
   if (isLoading) return <div className="min-h-screen flex justify-center items-center font-bold text-primary animate-pulse">Memuat Form Edit...</div>;
 
   return (
-    // Penyesuaian padding untuk Mobile
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans pb-10">
       <header className="bg-white border-b border-gray-200 p-4 sticky top-0 z-20 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center gap-3 md:gap-4">
@@ -115,14 +126,12 @@ export default function EditProduct() {
       <main className="flex-1 p-4 md:p-6 w-full max-w-4xl mx-auto mt-2 md:mt-6">
         <form onSubmit={handleSaveEdit} className="bg-white p-5 md:p-10 rounded-2xl md:rounded-3xl shadow-sm border border-gray-100 flex flex-col gap-5 md:gap-6">
           
-          {/* GRID UNTUK NAMA & KATEGORI (2 Kolom di Desktop, 1 Kolom di HP) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 md:gap-6">
             <div>
               <label className="text-xs md:text-sm font-bold text-gray-700 uppercase tracking-wide">Nama Komoditas</label>
               <input type="text" value={editData.nama_komoditas} onChange={(e) => setEditData({...editData, nama_komoditas: e.target.value})} className="w-full mt-1.5 p-3.5 md:p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-primary/30 transition text-sm md:text-base" required />
             </div>
 
-            {/* 4. INPUT KATEGORI BARU SESUAI REVISI */}
             <div>
               <label className="text-xs md:text-sm font-bold text-gray-700 uppercase tracking-wide">Kategori</label>
               <select 
@@ -156,11 +165,30 @@ export default function EditProduct() {
           </div>
 
           <div>
-            <label className="text-xs md:text-sm font-bold text-gray-700 uppercase tracking-wide">Lokasi Lahan / Titik Panen</label>
+            <label className="text-xs md:text-sm font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1">
+              Lokasi/Titik Panen <span className="text-red-500 lowercase font-normal">(Terkunci)</span>
+            </label>
             <div className="flex flex-col sm:flex-row gap-2 mt-1.5">
-              <input type="text" value={editData.lokasi_lahan} onChange={(e) => setEditData({...editData, lokasi_lahan: e.target.value})} className="flex-1 p-3.5 md:p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 ring-primary/30 transition text-sm md:text-base" required />
-              <button onClick={dapatkanLokasiLahan} type="button" className="bg-blue-100 text-blue-600 p-3.5 md:p-4 rounded-xl hover:bg-blue-200 transition font-bold shadow-sm flex items-center justify-center gap-2 sm:w-auto" title="Deteksi GPS">
-                <MapPin size={20} /> <span className="sm:hidden text-sm">Gunakan GPS</span>
+              <div className={`flex-1 flex items-center p-3.5 md:p-4 rounded-xl border transition ${lokasiBaruDidapat ? 'bg-green-50 border-green-500' : 'bg-gray-100 border-gray-200'}`}>
+                <MapPin size={20} className={`${lokasiBaruDidapat ? 'text-green-500' : 'text-gray-400'} mr-2 flex-shrink-0`} />
+                <input 
+                  type="text" 
+                  value={editData.lokasi_lahan} 
+                  readOnly 
+                  className="w-full bg-transparent outline-none cursor-not-allowed text-sm md:text-base text-gray-600" 
+                  required 
+                  placeholder="Perbarui via GPS"
+                />
+              </div>
+              <button 
+                onClick={dapatkanLokasiLahan} 
+                type="button" 
+                disabled={isLocating}
+                className={`p-3.5 md:p-4 rounded-xl transition font-bold shadow-sm flex items-center justify-center gap-2 sm:w-auto ${lokasiBaruDidapat ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-blue-100 text-blue-600 hover:bg-blue-200'}`} 
+                title="Deteksi GPS"
+              >
+                {lokasiBaruDidapat ? <CheckCircle2 size={20} /> : <MapPin size={20} className={isLocating ? 'animate-bounce' : ''} />} 
+                <span className="sm:hidden text-sm">{lokasiBaruDidapat ? 'Lokasi Diperbarui' : 'Perbarui GPS'}</span>
               </button>
             </div>
           </div>
