@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Send, ImagePlus, Bot, X, Loader2 } from 'lucide-react';
+import { Send, ImagePlus, Bot, X, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AiPenyuluh() {
   const [pesan, setPesan] = useState('');
   const [image, setImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [sisaKuota, setSisaKuota] = useState(null);
   
-  // State untuk menyimpan riwayat chat
+  // State default (akan tertimpa jika ada riwayat di database)
   const [chatHistory, setChatHistory] = useState([
     { 
       role: 'bot', 
@@ -17,6 +18,25 @@ export default function AiPenyuluh() {
   ]);
   
   const chatEndRef = useRef(null);
+
+  // 1. MENGAMBIL RIWAYAT CHAT DARI DATABASE SAAT HALAMAN DIBUKA
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/chat/history`, {
+          withCredentials: true // Wajib agar Cookie Token terkirim ke backend!
+        });
+        
+        if (res.data && res.data.length > 0) {
+          setChatHistory(res.data);
+        }
+      } catch (error) {
+        console.error("Gagal mengambil riwayat chat:", error);
+      }
+    };
+    
+    fetchHistory();
+  }, []);
 
   // Auto-scroll ke bawah setiap ada pesan baru
   useEffect(() => {
@@ -27,7 +47,7 @@ export default function AiPenyuluh() {
     const file = e.target.files[0];
     if (file) {
       setImage(file);
-      setImagePreview(URL.createObjectURL(file)); // Buat preview gambar
+      setImagePreview(URL.createObjectURL(file)); 
     }
   };
 
@@ -41,73 +61,78 @@ export default function AiPenyuluh() {
     if (!pesan.trim() && !image) return;
 
     const pesanUser = pesan;
-    const gambarDikirim = imagePreview; // Simpan preview untuk ditampilkan di chat user
+    const gambarDikirim = imagePreview; 
     
-    // Reset form input
     setPesan(''); 
     hapusGambar();
     
-    // Tambahkan pesan user ke layar
-    setChatHistory(prev => [...prev, { role: 'user', text: pesanUser, image: gambarDikirim }]);
+    setChatHistory(prev => [...prev, { role: 'user', text: pesanUser || "[Mengirim Gambar]", image: gambarDikirim }]);
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('user');
       const formData = new FormData();
       if (pesanUser) formData.append('pesan', pesanUser);
       if (image) formData.append('image', image);
 
-      const response = await axios.post(import.meta.env.VITE_API_URL + '/chat', formData, { 
-        headers: { 
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}` 
-        } 
+      // 2. KIRIM PESAN KE BACKEND (Dilengkapi dengan kredensial Cookie)
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, formData, { 
+        withCredentials: true, // Wajib agar tidak error "Gangguan Server"
+        headers: { 'Content-Type': 'multipart/form-data' } 
       });
 
-      // Tampilkan balasan AI
       setChatHistory(prev => [...prev, { role: 'bot', text: response.data.balasan }]);
+      
+      // Update sisa kuota jika backend mengirimkannya
+      if (response.data.sisaKuota !== undefined) {
+        setSisaKuota(response.data.sisaKuota);
+      }
+      
     } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'bot', text: 'Maaf, saya sedang mengalami gangguan koneksi ke server pusat. Silakan coba lagi.' }]);
+      // 3. TANGKAP ERROR KUOTA HABIS DARI BACKEND
+      const errorMessage = error.response?.data?.balasan || 'Maaf, saya sedang mengalami gangguan koneksi ke server pusat. Silakan coba lagi.';
+      setChatHistory(prev => [...prev, { role: 'bot', text: errorMessage }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    // CLASS 'absolute inset-0' SANGAT PENTING: Membuat halaman ini nge-pas di dalam MainLayout
     <div className="flex flex-col absolute inset-0 bg-gray-50 font-sans animate-fade-in">
       
-      {/* AREA CHAT (Otomatis menyesuaikan tinggi layar dan bisa di-scroll) */}
+      {/* HEADER INFORMASI KUOTA (Opsional, muncul jika sisaKuota terdeteksi) */}
+      {sisaKuota !== null && (
+        <div className="bg-green-100 text-green-800 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2 shadow-sm z-20">
+          <AlertCircle size={14} /> 
+          Sisa Kuota Tanya Jawab Hari Ini: {sisaKuota} kali
+        </div>
+      )}
+
+      {/* AREA CHAT */}
       <div className="flex-1 overflow-y-auto p-4 md:p-8">
         <div className="max-w-3xl mx-auto flex flex-col gap-6 pb-4">
           {chatHistory.map((chat, index) => (
             <div key={index} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               
-              {/* Avatar AI */}
               {chat.role === 'bot' && (
                 <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mr-3 flex-shrink-0 mt-1 shadow-sm">
                   <Bot size={18} />
                 </div>
               )}
 
-              {/* Balon Chat */}
               <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-4 shadow-sm text-[15px] leading-relaxed ${
                 chat.role === 'user' 
                   ? 'bg-primary text-white rounded-tr-none' 
                   : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
               }`}>
-                {/* Jika user mengirim gambar, tampilkan di atas teks */}
                 {chat.image && (
                   <img src={chat.image} alt="Upload User" className="w-48 h-auto rounded-xl mb-3 border border-black/10 shadow-sm" />
                 )}
-                {/* Teks Chat AI di-render agar **Tebal** bisa jadi tebal sungguhan */}
                 <div dangerouslySetInnerHTML={{ __html: chat.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }} />
               </div>
 
             </div>
           ))}
 
-          {/* Indikator Loading saat AI berpikir */}
           {loading && (
             <div className="flex justify-start">
               <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center mr-3 flex-shrink-0 mt-1 shadow-sm">
@@ -115,7 +140,7 @@ export default function AiPenyuluh() {
               </div>
               <div className="bg-white border border-gray-200 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-3">
                 <Loader2 size={18} className="animate-spin text-primary" />
-                <span className="text-sm text-gray-500 font-medium">Memproses data satelit dan visual...</span>
+                <span className="text-sm text-gray-500 font-medium">Memproses data...</span>
               </div>
             </div>
           )}
@@ -123,11 +148,10 @@ export default function AiPenyuluh() {
         </div>
       </div>
 
-      {/* FORM INPUT STICKY DI BAWAH (Menempel dengan elegan) */}
+      {/* FORM INPUT */}
       <footer className="bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
         <div className="max-w-3xl mx-auto">
           
-          {/* Preview Gambar Sebelum Dikirim */}
           {imagePreview && (
             <div className="mb-3 relative inline-block animate-fade-in">
               <img src={imagePreview} alt="Preview" className="h-20 w-20 object-cover rounded-xl border-2 border-primary shadow-sm" />
@@ -155,7 +179,6 @@ export default function AiPenyuluh() {
                 e.target.style.height = e.target.scrollHeight + 'px';
               }}
               onKeyDown={(e) => {
-                // Submit pakai tombol Enter (kecuali Shift+Enter untuk baris baru)
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   kirimPesan(e);

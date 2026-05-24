@@ -99,7 +99,7 @@ const handleSave = async (e) => {
     toast.success(response.data.pesan, { id: loadingToast });
     localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user')), ...response.data.user }));
   } catch (error) {
-    toast.error('Gagal menyimpan profil.', { id: loadingToast });
+    toast.error('Gagal menyimpan profil(nomor sudah ada).', { id: loadingToast });
   } finally {
     setIsSaving(false);
   }

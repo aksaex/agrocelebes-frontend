@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { Mail, Lock, LogIn, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Mail, Lock, LogIn, ShieldCheck, ArrowRight, Eye, EyeOff } from 'lucide-react'; // ✨ TAMBAHKAN Eye dan EyeOff
 import toast from 'react-hot-toast';
 import { useGoogleLogin } from '@react-oauth/google';
-import OnboardingModal from '../components/OnboardingModal'; // <-- IMPORT MODAL SAKTI
+import OnboardingModal from '../components/OnboardingModal';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // ✨ STATE UNTUK TOGGLE PASSWORD
 
   // STATE UNTUK MODAL
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -27,9 +28,7 @@ export default function Login() {
           toast.dismiss(toastId);
           setShowOnboarding(true); 
         } else {
-          // 👇 TAMBAHKAN BARIS INI KEMBALI
           localStorage.setItem('token', res.data.token); 
-          
           localStorage.setItem('user', JSON.stringify(res.data.user));
           toast.success(`Selamat datang, ${res.data.user.nama}!`, { id: toastId });
           navigate('/dashboard');
@@ -44,9 +43,7 @@ export default function Login() {
     prompt: 'select_account'
   });
 
-const handleOnboardingSuccess = (data) => {
-    // localStorage.setItem('token', data.token);
-    // ✅ HANYA SIMPAN DATA USER SAJA:
+  const handleOnboardingSuccess = (data) => {
     localStorage.setItem('user', JSON.stringify(data.user));
     setShowOnboarding(false);
     navigate('/dashboard');
@@ -58,7 +55,6 @@ const handleOnboardingSuccess = (data) => {
     try {
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/login`, { email, password });
       
-      // 👇 TAMBAHKAN BARIS INI KEMBALI
       localStorage.setItem('user', JSON.stringify(response.data.user)); 
       navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
       
@@ -99,10 +95,27 @@ const handleOnboardingSuccess = (data) => {
               <input type="email" placeholder="Email Terdaftar" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium" />
             </div>
 
+            {/* ✨ BAGIAN PASSWORD YANG DIUBAH */}
             <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
               <Lock size={20} className="text-gray-400 mr-3" />
-              <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-transparent outline-none w-full text-sm font-medium" />
+              <input 
+                type={showPassword ? "text" : "password"} 
+                placeholder="Password" 
+                required 
+                value={password} 
+                onChange={(e) => setPassword(e.target.value)} 
+                className="bg-transparent outline-none w-full text-sm font-medium" 
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-gray-400 hover:text-gray-600 transition ml-2"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
             </div>
+
             <div className="flex justify-end">
               <Link to="/forgot-password" className="text-xs text-red-500 font-bold hover:underline hover:text-red-700">Lupa Sandi?</Link>
             </div>
@@ -129,7 +142,6 @@ const handleOnboardingSuccess = (data) => {
         </div>
       </div>
 
-      {/* PANGGIL KOMPONEN MODAL DI SINI (1 BARIS SAJA!) */}
       <OnboardingModal 
         isOpen={showOnboarding} 
         googleAccessToken={googleAccessToken} 

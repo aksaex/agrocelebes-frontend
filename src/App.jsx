@@ -2,41 +2,42 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import axios from 'axios';
 import toast, { Toaster } from 'react-hot-toast';
 
-// Import Komponen Layout Utama (Sidebar & Topbar Menetap)
+// Import Komponen Layout Utama
 import MainLayout from './components/MainLayout';
-
-// Import Google OAuth
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-// Import Semua Halaman
+// ==========================================
+// IMPORT DASHBOARD & ADMIN PAGE
+// ==========================================
+import PetaniDashboard from './pages/petani/PetaniDashboard';
+import PembeliDashboard from './pages/pembeli/PembeliDashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import UserMenej from './pages/admin/UserMenej'; // <-- IMPORT HALAMAN MANAJEMEN USER
+
+// Import Halaman Lainnya
 import JurnalTani from './pages/JurnalTani';
 import PostProduct from './pages/PostProduct';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
 import ProductDetail from './pages/ProductDetail';
 import EditProduct from './pages/EditProduct';
 import PasarB2B from './pages/PasarB2B';
 import Profile from './pages/Profile';
 import AiPenyuluh from './pages/AiPenyuluh';
-import AdminDashboard from './pages/AdminDashboard';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import NotFound from './pages/NotFound';
 import KalkulatorTani from './pages/KalkulatorTani';
 
 // =====================================================================
-// 1. AXIOS INTERCEPTOR (Sistem Auto-Logout jika Sesi Habis)
+// 1. AXIOS INTERCEPTOR
 // =====================================================================
 axios.interceptors.response.use(
   (response) => response, 
   (error) => {
-    // Jika Backend menolak karena Token di Cookie Expired / Tidak Valid (401)
     if (error.response && error.response.status === 401) {
-      // PERUBAHAN: Hapus HANYA data user, karena Token sudah bukan urusan localStorage
       localStorage.removeItem('user');
-      localStorage.removeItem('token');
       toast.error('Sesi Anda telah habis. Silakan login kembali.', { duration: 4000 });
       window.location.href = '/login'; 
     }
@@ -45,69 +46,74 @@ axios.interceptors.response.use(
 );
 
 // =====================================================================
-// 2. SATPAM PINTU UTAMA (Protected Route Component)
+// 2. SATPAM PINTU UTAMA
 // =====================================================================
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  // PERUBAHAN: Kita tidak lagi mengecek token dari localStorage!
-  // Javascript tidak bisa membaca HttpOnly Cookie, jadi kita percayakan
-  // identitas user pada localStorage. Keamanan aslinya tetap dicegat oleh Backend.
   const user = JSON.parse(localStorage.getItem('user'));
 
-  // Aturan 1: Tidak ada data user? Tendang ke Login!
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
 
-  // Aturan 2: Punya data, tapi mencoba masuk ke ruangan khusus (misal: Admin)?
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     toast.error('Akses Ditolak! Anda tidak memiliki izin ke halaman ini.');
     return <Navigate to="/dashboard" replace />; 
   }
 
-  // Jika lolos semua aturan, silakan masuk ke halaman yang dituju
   return children;
 };
 
 // =====================================================================
-// 3. ROUTER UTAMA (GoogleOAuthProvider HARUS di sini)
+// 3. POLISI LALU LINTAS DASHBOARD
+// =====================================================================
+const DashboardRouter = () => {
+  const user = JSON.parse(localStorage.getItem('user'));
+  if (!user) return <Navigate to="/login" replace />;
+
+  if (user.role === 'petani') return <Navigate to="/petani/dashboard" replace />;
+  if (user.role === 'pembeli') return <Navigate to="/pembeli/dashboard" replace />;
+  if (user.role === 'admin') return <Navigate to="/admin/dashboard" replace />;
+
+  return <Navigate to="/login" replace />;
+};
+
+// =====================================================================
+// 4. ROUTER UTAMA
 // =====================================================================
 function App() {
   return (
-    // BUNGKUS SELURUH APLIKASI DENGAN GOOGLE PROVIDER
-    <GoogleOAuthProvider clientId="674337918356-fc34bqr89b96dmjavff3r2nhodgs5tqs.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || "674337918356-fc34bqr89b96dmjavff3r2nhodgs5tqs.apps.googleusercontent.com"}>
       <Router>
-        {/* Toaster Global untuk Notifikasi Elegan */}
         <Toaster position="top-center" reverseOrder={false} />
-        
         <Routes>
-          {/* === JALUR PUBLIK (Bisa diakses siapa saja) === */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
-          {/* === JALUR PRIVAT DENGAN LAYOUT (Sidebar Menetap) === */}
-          <Route path="/dashboard" element={<ProtectedRoute><MainLayout><Dashboard /></MainLayout></ProtectedRoute>} />
-          <Route path="/pasar-b2b" element={<ProtectedRoute><MainLayout><PasarB2B /></MainLayout></ProtectedRoute>} />
-          <Route path="/ai-penyuluh" element={<ProtectedRoute><MainLayout><AiPenyuluh /></MainLayout></ProtectedRoute>} />
-          <Route path="/kalkulator" element={<ProtectedRoute><MainLayout><KalkulatorTani /></MainLayout></ProtectedRoute>} />
-          <Route path="/jurnal" element={<ProtectedRoute><MainLayout><JurnalTani /></MainLayout></ProtectedRoute>} />
+          <Route path="/dashboard" element={<DashboardRouter />} />
 
-          {/* === JALUR PRIVAT TANPA LAYOUT (Halaman Penuh) === */}
-          <Route path="/post-product" element={<ProtectedRoute><PostProduct /></ProtectedRoute>} />
+          {/* === JALUR PRIVAT DASHBOARD === */}
+          <Route path="/petani/dashboard" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><PetaniDashboard /></MainLayout></ProtectedRoute>} />
+          <Route path="/pembeli/dashboard" element={<ProtectedRoute allowedRoles={['pembeli']}><MainLayout><PembeliDashboard /></MainLayout></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><MainLayout><AdminDashboard /></MainLayout></ProtectedRoute>} />
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+          {/* === JALUR KHUSUS ADMIN === */}
+          <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><MainLayout><UserMenej /></MainLayout></ProtectedRoute>} />
+
+          {/* === JALUR PRIVAT GLOBAL === */}
+          <Route path="/pasar-b2b" element={<ProtectedRoute><MainLayout><PasarB2B /></MainLayout></ProtectedRoute>} />
+          
+          <Route path="/ai-penyuluh" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><AiPenyuluh /></MainLayout></ProtectedRoute>} />
+          <Route path="/kalkulator" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><KalkulatorTani /></MainLayout></ProtectedRoute>} />
+          <Route path="/jurnal" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><JurnalTani /></MainLayout></ProtectedRoute>} />
+
+          <Route path="/post-product" element={<ProtectedRoute allowedRoles={['petani']}><PostProduct /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
-          <Route path="/edit-product/:id" element={<ProtectedRoute><EditProduct /></ProtectedRoute>} />
-
-          {/* === JALUR VVIP KHUSUS SUPER ADMIN === */}
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
           
-          {/* === JALUR TERSESAT (404 Not Found) === */}
+          <Route path="/edit-product/:id" element={<ProtectedRoute allowedRoles={['petani', 'admin']}><EditProduct /></ProtectedRoute>} />
+          
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>

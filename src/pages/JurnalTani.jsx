@@ -27,7 +27,7 @@ export default function JurnalTani() {
   const [formKas, setFormKas] = useState({ tanggal: '', deskripsi: '', nominal: '', jenis_kas: 'pengeluaran' });
   const [formJadwal, setFormJadwal] = useState({ tanggal: '', kegiatan: '' });
 
-  const getToken = () => localStorage.getItem('user');
+  const getToken = () => localStorage.getItem('token');
 
   // ==========================================
   // 1. LISTENER JARINGAN & LOAD AWAL

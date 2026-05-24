@@ -1,140 +1,147 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
+import { Image, Send, X, Paperclip, AlertCircle } from 'lucide-react';
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [pesan, setPesan] = useState('');
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [sisaKuota, setSisaKuota] = useState(null);
   const [chatHistory, setChatHistory] = useState([
-    { role: 'bot', text: 'Halo! Saya Penyuluh Pintar AgroCelebes. Ada yang bisa saya bantu terkait pertanyaan pertanian Anda hari ini?' }
+    { role: 'bot', text: 'Halo! Saya Penyuluh Pintar. Ada yang bisa saya bantu terkait pertanian hari ini?' }
   ]);
   
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Auto-scroll ke pesan paling bawah saat ada pesan baru
+  // Load Riwayat dari DB saat pertama kali buka
+  useEffect(() => {
+    if (isOpen) {
+      axios.get(`${import.meta.env.VITE_API_URL}/chat/history`, {
+        withCredentials: true // Wajib agar Cookie Token terkirim!
+      }).then(res => {
+        if (res.data.length > 0) setChatHistory(res.data);
+      }).catch(err => console.error("Gagal load riwayat", err));
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatHistory, isOpen]);
+  }, [chatHistory]);
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImage(file);
+      setPreview(URL.createObjectURL(file));
+    }
+  };
 
   const kirimPesan = async (e) => {
     e.preventDefault();
-    if (!pesan.trim()) return;
+    if (!pesan.trim() && !image) return;
 
-    const pesanUser = pesan;
-    setPesan(''); 
+    const formData = new FormData();
+    formData.append('pesan', pesan);
+    if (image) formData.append('image', image);
+
+    const userEntry = { role: 'user', text: pesan || "Mengirim gambar..." };
+    setChatHistory(prev => [...prev, userEntry]);
     
-    setChatHistory(prev => [...prev, { role: 'user', text: pesanUser }]);
+    // Reset input
+    setPesan('');
+    setImage(null);
+    setPreview(null);
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('user');
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, 
-        { pesan: pesanUser },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // 👇 REVISI: Hapus pencarian token manual, gunakan Cookie otomatis!
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, formData, {
+        withCredentials: true, // Wajib agar HttpOnly Cookie ikut terkirim
+        headers: { 
+          'Content-Type': 'multipart/form-data'
+        }
+      });
 
       setChatHistory(prev => [...prev, { role: 'bot', text: response.data.balasan }]);
+      setSisaKuota(response.data.sisaKuota);
     } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'bot', text: 'Maaf, saya sedang mengalami gangguan jaringan. Coba lagi nanti ya!' }]);
+      const errorMsg = error.response?.data?.balasan || 'Maaf, sistem sedang sibuk. Silakan coba lagi.';
+      setChatHistory(prev => [...prev, { role: 'bot', text: errorMsg }]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <>
-      {/* CSS KHUSUS UNTUK SCROLLBAR CHAT YANG ELEGAN */}
-      <style>{`
-        .chat-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .chat-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .chat-scrollbar::-webkit-scrollbar-thumb {
-          background-color: #16a34a;
-          border-radius: 10px;
-        }
-      `}</style>
+    <div className="fixed bottom-6 right-6 z-[9999]">
+      {!isOpen ? (
+        <button onClick={() => setIsOpen(true)} className="bg-primary hover:bg-green-700 text-white w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 active:scale-95">
+          <Send size={28} />
+        </button>
+      ) : (
+        <div className="bg-white w-[90vw] sm:w-[400px] h-[500px] sm:h-[600px] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-gray-100 animate-in fade-in zoom-in duration-300">
+          
+          {/* Header */}
+          <div className="bg-primary p-5 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-full">🤖</div>
+              <div>
+                <h3 className="font-bold">Penyuluh Pintar</h3>
+                <p className="text-[10px] text-green-200">
+                   {sisaKuota !== null ? `Sisa Kuota: ${sisaKuota} Tanya` : 'Online'}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="hover:rotate-90 transition-transform"><X /></button>
+          </div>
 
-      <div className="fixed bottom-6 right-6 z-50">
-        {!isOpen && (
-          <button 
-            onClick={() => setIsOpen(true)}
-            className="bg-primary hover:bg-green-700 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center transform transition-transform hover:scale-110"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
-          </button>
-        )}
-
-        {isOpen && (
-          <div className="bg-white w-80 sm:w-96 rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 h-[32rem]">
-            
-            {/* Header */}
-            <div className="bg-primary text-white p-4 flex justify-between items-center shadow-md z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-xl">🤖</div>
-                <div>
-                  <h3 className="font-bold text-sm">Penyuluh AI</h3>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-300 rounded-full animate-pulse"></span>
-                    <p className="text-[10px] text-green-100">Online</p>
-                  </div>
+          {/* Area Chat */}
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-50 flex flex-col gap-4">
+            {chatHistory.map((chat, i) => (
+              <div key={i} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] p-3 rounded-2xl text-sm shadow-sm ${
+                  chat.role === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-200'
+                }`}>
+                  {chat.text}
                 </div>
               </div>
-              <button onClick={() => setIsOpen(false)} className="text-white/80 hover:text-white transition">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              </button>
-            </div>
-
-            {/* AREA PERCAKAPAN (Scrollable dengan Custom Scrollbar) */}
-            <div className="flex-1 p-4 bg-[#f8fafc] overflow-y-auto chat-scrollbar flex flex-col gap-4">
-              {chatHistory.map((chat, index) => (
-                <div key={index} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`p-3 max-w-[85%] text-sm leading-relaxed shadow-sm ${
-                    chat.role === 'user' 
-                      ? 'bg-primary text-white rounded-2xl rounded-tr-none' 
-                      : 'bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-tl-none'
-                  }`}>
-                    {chat.text}
-                  </div>
-                </div>
-              ))}
-              
-              {loading && (
-                <div className="flex justify-start">
-                  <div className="bg-white border border-gray-100 p-4 rounded-2xl rounded-tl-none shadow-sm flex gap-1.5">
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce"></span>
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></span>
-                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></span>
-                  </div>
-                </div>
-              )}
-              {/* Dummy div agar auto-scroll ke bawah berfungsi sempurna */}
-              <div ref={chatEndRef} />
-            </div>
-
-            {/* Form Input Pesan */}
-            <form onSubmit={kirimPesan} className="p-3 bg-white border-t border-gray-100 flex gap-2">
-              <input 
-                type="text" 
-                value={pesan}
-                onChange={(e) => setPesan(e.target.value)}
-                placeholder="Tanyakan masalah tanamanmu..." 
-                className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm"
-              />
-              <button 
-                type="submit" 
-                disabled={loading || !pesan.trim()}
-                className="bg-primary text-white p-3 rounded-xl font-bold hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-              </button>
-            </form>
-            
+            ))}
+            <div ref={chatEndRef} />
           </div>
-        )}
-      </div>
-    </>
+
+          {/* Preview Gambar */}
+          {preview && (
+            <div className="px-4 py-2 bg-gray-100 flex items-center gap-2">
+              <img src={preview} className="w-12 h-12 object-cover rounded-lg border-2 border-primary" />
+              <button onClick={() => {setImage(null); setPreview(null)}} className="text-red-500"><X size={16}/></button>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={kirimPesan} className="p-4 bg-white border-t border-gray-100">
+            <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-2xl">
+              <button type="button" onClick={() => fileInputRef.current.click()} className="text-gray-500 hover:text-primary">
+                <Paperclip size={20} />
+              </button>
+              <input 
+                type="file" ref={fileInputRef} hidden accept="image/*" 
+                onChange={handleImageChange}
+              />
+              <input 
+                type="text" value={pesan} onChange={(e) => setPesan(e.target.value)}
+                placeholder="Tulis pesan..."
+                className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2"
+              />
+              <button type="submit" disabled={loading} className="text-primary disabled:text-gray-400">
+                <Send size={20} />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }

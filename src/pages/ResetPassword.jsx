@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Lock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Lock, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react'; // ✨ TAMBAHKAN Eye dan EyeOff
 import toast from 'react-hot-toast';
 
 export default function ResetPassword() {
@@ -10,9 +10,10 @@ export default function ResetPassword() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false); // ✨ STATE UNTUK PASSWORD
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // ✨ STATE UNTUK KONFIRMASI PASSWORD
 
-
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // RegEx: 8+ Karakter, 1 Huruf Besar, 1 Angka, 1 Karakter Khusus (@$!%*?&)
@@ -22,13 +23,11 @@ const handleSubmit = async (e) => {
       return toast.error("Password tidak cocok!");
     }
     if (!passwordRegex.test(password)) {
-      // Ubah pesan error agar user tahu syaratnya
       return toast.error("Sandi harus 8+ karakter, ada huruf besar, angka, & simbol (@$!%*?&)");
     }
 
     setLoading(true);
     const toastId = toast.loading('Menyimpan sandi baru...');
-    // ... sisa kode axios tetap sama
     try {
       const res = await axios.put(`${import.meta.env.VITE_API_URL}/auth/reset-password/${token}`, { password });
       toast.success(res.data.pesan || "Password berhasil diubah!", { id: toastId });
@@ -63,26 +62,44 @@ const handleSubmit = async (e) => {
               <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition shadow-sm">
                 <Lock size={18} className="text-gray-400 mr-3" />
                 <input 
-                  type="password" placeholder="Minimal 6 karakter" 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="Minimal 8 karakter" 
                   required 
-                  minLength="6" // <--- KUNCI KEAMANAN HTML
-                  value={password} onChange={(e) => setPassword(e.target.value)} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
                   className="bg-transparent outline-none w-full text-sm font-medium text-gray-700" 
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-gray-400 hover:text-gray-600 transition ml-2"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1">Konfirmasi Sandi Baru</label>
+              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-widest pl-1">Konfirmasi Sandi</label>
               <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition shadow-sm">
                 <CheckCircle2 size={18} className="text-gray-400 mr-3" />
                 <input 
-                  type="password" placeholder="Ketik ulang sandi baru" 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  placeholder="ketik ulang sandi" 
                   required 
-                  minLength="6" // <--- KUNCI KEAMANAN HTML
-                  value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} 
+                  value={confirmPassword} 
+                  onChange={(e) => setConfirmPassword(e.target.value)} 
                   className="bg-transparent outline-none w-full text-sm font-medium text-gray-700" 
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="text-gray-400 hover:text-gray-600 transition ml-2"
+                  tabIndex={-1}
+                >
+                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 

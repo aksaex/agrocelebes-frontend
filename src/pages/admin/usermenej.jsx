@@ -1,27 +1,27 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, Trash2, Users, ArrowLeft, Building, Sprout, Mail, Phone, MapPin } from 'lucide-react';
-import toast from 'react-hot-toast'; // Menggunakan notifikasi modern
+import { ShieldAlert, Trash2, Users, Building, Sprout, Mail, Phone, MapPin } from 'lucide-react';
+import toast from 'react-hot-toast';
 
-export default function AdminDashboard() {
+export default function UserMenej() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Pengecekan keamanan sudah ditangani oleh ProtectedRoute di App.jsx
-    // Jadi kita bisa langsung fokus mengambil data.
-    fetchUsers(localStorage.getItem('user'));
+    fetchUsers();
   }, []);
 
-  const fetchUsers = async (token) => {
+  const fetchUsers = async () => {
     try {
       const res = await axios.get(import.meta.env.VITE_API_URL + '/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
+        // 👇 KUNCI SAKTI: Menyuruh axios mengirimkan HttpOnly Cookie JWT
+        withCredentials: true 
       });
       setUsers(res.data);
     } catch (error) {
+      console.error(error);
       toast.error('Gagal mengambil data pengguna.');
     } finally {
       setIsLoading(false);
@@ -29,15 +29,15 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteUser = async (id, nama) => {
-    // Kita tetap menggunakan window.confirm karena ini adalah tindakan destruktif tingkat tinggi
     if (window.confirm(`⚠️ PERINGATAN FATAL!\n\nAnda akan menghapus akun "${nama}" beserta seluruh produk komoditas dan fotonya secara permanen.\n\nLanjutkan?`)) {
       const toastId = toast.loading('Menghapus pengguna dan data terkait...');
       try {
         await axios.delete(`${import.meta.env.VITE_API_URL}/admin/users/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('user')}` }
+          // 👇 KUNCI SAKTI: Menyuruh axios mengirimkan HttpOnly Cookie JWT
+          withCredentials: true
         });
         toast.success(`Pengguna ${nama} berhasil dihapus!`, { id: toastId });
-        setUsers(users.filter(u => u._id !== id)); // Hapus dari layar seketika
+        setUsers(users.filter(u => u._id !== id));
       } catch (error) {
         toast.error(error.response?.data?.pesan || 'Gagal menghapus pengguna.', { id: toastId });
       }
@@ -49,37 +49,8 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans pb-12">
       
-      {/* HEADER HIJAU TUA (Mengingatkan pada warna utama Landing Page) */}
-      <div className="bg-[#0f3d1f] pt-8 pb-28 px-4 md:px-8">
-        <div className="max-w-7xl mx-auto">
-          
-          {/* Tombol Kembali yang Elegan */}
-          <button onClick={() => navigate('/dashboard')} className="inline-flex items-center gap-2 text-green-50 bg-white/10 hover:bg-white/20 hover:text-white px-5 py-2.5 rounded-full transition-all font-semibold text-sm mb-8 backdrop-blur-sm border border-white/10 shadow-sm">
-            <ArrowLeft size={18} /> Kembali
-          </button>
-
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-white flex items-center gap-3 tracking-tight">
-                <ShieldAlert size={36} className="text-red-400" /> Control Panel
-              </h1>
-              <p className="text-green-100/80 mt-2 text-sm md:text-base max-w-lg">Pusat kendali administratif AgroCelebes. Kelola pengguna dan pantau ekosistem sistem dengan hati-hati.</p>
-            </div>
-            
-            {/* Widget Total Pengguna */}
-            <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl flex items-center gap-4 border border-white/10 shadow-lg min-w-[200px]">
-              <div className="bg-primary p-3 rounded-xl shadow-inner"><Users size={24} className="text-white"/></div>
-              <div>
-                <p className="text-xs text-green-100 font-bold uppercase tracking-wider">Total Pengguna</p>
-                <p className="text-2xl font-extrabold text-white">{users.length} <span className="text-sm font-medium opacity-80">Akun</span></p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KONTEN UTAMA (Menumpuk di atas Header Hijau) */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 -mt-16 relative z-10">
+      {/* KONTEN UTAMA LANGSUNG TANPA HEADER */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8">
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
           
           {/* TAMPILAN DESKTOP (TABEL KLASIK YANG RAPI) */}
@@ -92,7 +63,7 @@ export default function AdminDashboard() {
                   <th className="p-6">Kontak & Lokasi</th>
                   <th className="p-6">Tgl Terdaftar</th>
                   <th className="p-6 text-center">Aksi</th>
-                </tr>
+                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {users.map((user) => (

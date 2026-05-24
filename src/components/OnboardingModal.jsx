@@ -69,7 +69,7 @@ export default function OnboardingModal({ isOpen, googleAccessToken, defaultRole
       onSuccess(res.data);
       toast.success(`Akun berhasil dibuat! Selamat datang, ${res.data.user.nama}!`, { id: toastId });
     } catch (err) {
-      toast.error('Gagal mengirim data tambahan.', { id: toastId });
+      toast.error('Gagal mengirim data tambahan(nomor sudah ada).', { id: toastId });
     } finally {
       setLoading(false);
     }
