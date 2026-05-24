@@ -11,7 +11,7 @@ export default function AgendaWidget() {
   useEffect(() => {
     const fetchAgenda = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('user');
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/jurnal`, {
           headers: { Authorization: `Bearer ${token}` }
         });

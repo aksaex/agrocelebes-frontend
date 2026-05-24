@@ -52,7 +52,7 @@ export default function AiPenyuluh() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('user');
       const formData = new FormData();
       if (pesanUser) formData.append('pesan', pesanUser);
       if (image) formData.append('image', image);

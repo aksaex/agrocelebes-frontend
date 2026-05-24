@@ -25,26 +25,19 @@ export default function MainLayout({ children }) {
   // ==========================================
   // PERBAIKAN: FUNGSI LOGOUT (MENGHAPUS COOKIE)
   // ==========================================
-  const handleLogout = async () => {
+ const handleLogout = async () => {
     try {
-      // 1. Beritahu Backend untuk menghapus HttpOnly Cookie
-      await axios.post(import.meta.env.VITE_API_URL + '/auth/logout');
-      
-      // 2. Bersihkan sisa data profil dari browser
-      localStorage.clear();
-      
-      // 3. (Opsional) Munculkan pesan sukses
-      toast.success('Berhasil keluar dari sistem');
-      
-      // 4. Arahkan kembali ke halaman login
-      navigate('/login');
+        // Panggil endpoint logout di backend untuk menghancurkan HttpOnly Cookie
+        await axios.post(`${import.meta.env.VITE_API_URL}/auth/logout`);
     } catch (error) {
-      console.error("Gagal melakukan logout:", error);
-      // Jika terjadi error (misal koneksi terputus), paksa bersihkan lokal saja
-      localStorage.clear();
-      navigate('/login');
+        console.error("Gagal logout dari server", error);
+    } finally {
+        // Hapus data user di frontend
+        localStorage.removeItem('user');
+        // Arahkan ke halaman login
+        window.location.href = '/login';
     }
-  };
+};
 
   const isActive = (path) => location.pathname === path;
 

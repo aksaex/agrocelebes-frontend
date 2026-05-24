@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Wallet, CalendarDays, Plus, Trash2, CheckCircle2, Circle, Sprout, CloudSnow, WifiOff, RefreshCcw, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
@@ -10,8 +10,15 @@ export default function JurnalTani() {
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'kas');
   const [isLoading, setIsLoading] = useState(true);
   
+  // 👇 TAMBAHAN: Mencegah user klik tombol simpan berkali-kali (Double Click)
+  const [isSaving, setIsSaving] = useState(false); 
+  
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
+  
+  // 👇 REF UNTUK CEGAH DOUBLE SYNC (Dari DeepSeek - Sangat Aman)
+  const isSyncingRef = useRef(false);
+  const hasFetchedAfterSyncRef = useRef(false);
 
   const [kasList, setKasList] = useState([]);
   const [jadwalList, setJadwalList] = useState([]);
@@ -20,7 +27,7 @@ export default function JurnalTani() {
   const [formKas, setFormKas] = useState({ tanggal: '', deskripsi: '', nominal: '', jenis_kas: 'pengeluaran' });
   const [formJadwal, setFormJadwal] = useState({ tanggal: '', kegiatan: '' });
 
-  const getToken = () => localStorage.getItem('token');
+  const getToken = () => localStorage.getItem('user');
 
   // ==========================================
   // 1. LISTENER JARINGAN & LOAD AWAL
@@ -50,13 +57,17 @@ export default function JurnalTani() {
     };
   }, [navigate]);
 
+  // 👇 EFEK SINKRONISASI ANTI DOUBLE FETCH
   useEffect(() => {
-    if (isOnline && unsyncedData.length > 0) {
+    if (isOnline && unsyncedData.length > 0 && !isSyncingRef.current) {
       syncDataLokalKeCloud();
-    } else if (isOnline && unsyncedData.length === 0 && !isLoading) {
-       fetchJurnalCloud();
+    } else if (isOnline && unsyncedData.length === 0 && !isLoading && !hasFetchedAfterSyncRef.current) {
+      hasFetchedAfterSyncRef.current = true;
+      fetchJurnalCloud();
+    } else if (!isOnline) {
+      hasFetchedAfterSyncRef.current = false;
     }
-  }, [isOnline]);
+  }, [isOnline, unsyncedData.length]);
 
   const loadDataLokal = () => {
     const localKas = localStorage.getItem('agro_kas');
@@ -69,6 +80,7 @@ export default function JurnalTani() {
 
     if (navigator.onLine) {
       if (!localUnsynced || JSON.parse(localUnsynced).length === 0) {
+        hasFetchedAfterSyncRef.current = true;
         fetchJurnalCloud();
       } else {
         syncDataLokalKeCloud();
@@ -100,57 +112,94 @@ export default function JurnalTani() {
   };
 
   // ==========================================
-  // 3. FUNGSI SINKRONISASI
+  // 3. FUNGSI SINKRONISASI (CEGAH DUPLIKASI)
   // ==========================================
   const syncDataLokalKeCloud = async () => {
-    if (!isOnline || isSyncing) return;
+    if (!isOnline || isSyncingRef.current) return;
     
     const currentUnsynced = JSON.parse(localStorage.getItem('agro_unsynced')) || [];
     if (currentUnsynced.length === 0) {
-      fetchJurnalCloud();
+      if (!hasFetchedAfterSyncRef.current) {
+        hasFetchedAfterSyncRef.current = true;
+        fetchJurnalCloud();
+      }
       return;
     }
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
-    let syncSuccessCount = 0;
+    
+    const successItems = [];
+    const failedItems = [];
 
     for (const item of currentUnsynced) {
       try {
         const payload = { ...item };
         delete payload._id; 
+        delete payload.synced; 
 
         await axios.post(`${import.meta.env.VITE_API_URL}/jurnal`, payload, {
           headers: { Authorization: `Bearer ${getToken()}` }
         });
-        syncSuccessCount++;
+        successItems.push(item);
       } catch (error) {
         console.error("Gagal kirim data antrean:", error);
+        failedItems.push(item);
       }
     }
 
-    if (syncSuccessCount === currentUnsynced.length) {
-      setUnsyncedData([]);
-      localStorage.removeItem('agro_unsynced');
-      toast.success(`${syncSuccessCount} catatan offline berhasil masuk Cloud!`);
-      await fetchJurnalCloud(); 
-    } else {
-      toast.error('Beberapa catatan gagal disinkronkan. Akan dicoba lagi nanti.');
+    // 👇 HANYA HAPUS DATA YANG SUKSES DARI ANTREAN
+    if (successItems.length > 0) {
+      const remainingUnsynced = failedItems;
+      setUnsyncedData(remainingUnsynced);
+      
+      if (remainingUnsynced.length === 0) {
+        localStorage.removeItem('agro_unsynced');
+        toast.success(`${successItems.length} catatan offline berhasil masuk Cloud!`);
+        
+        hasFetchedAfterSyncRef.current = false;
+        await fetchJurnalCloud();
+      } else {
+        localStorage.setItem('agro_unsynced', JSON.stringify(remainingUnsynced));
+        toast.error(`${successItems.length} tersinkron, ${failedItems.length} gagal. Akan dicoba lagi nanti.`);
+      }
+      
+      // 👇 HAPUS DATA LOKAL YANG SUDAH TERSINKRON (Mencegah tampilan dobel di UI)
+      const updatedKasList = kasList.filter(kas => 
+        !successItems.some(success => success._id === kas._id)
+      );
+      const updatedJadwalList = jadwalList.filter(jadwal => 
+        !successItems.some(success => success._id === jadwal._id)
+      );
+      
+      setKasList(updatedKasList);
+      setJadwalList(updatedJadwalList);
+      localStorage.setItem('agro_kas', JSON.stringify(updatedKasList));
+      localStorage.setItem('agro_jadwal', JSON.stringify(updatedJadwalList));
+      
+    } else if (failedItems.length > 0) {
+      toast.error('Gagal menyinkronkan data. Coba lagi nanti.');
     }
     
+    isSyncingRef.current = false;
     setIsSyncing(false);
   };
 
+  // 👇 SIMPAN KE LOKAL + ANTREAN DENGAN ID SUPER UNIK
   const simpanKelokalDanAntrean = (newItem, tipe) => {
-    const updatedUnsynced = [...unsyncedData, newItem];
+    const uniqueId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const itemWithUniqueId = { ...newItem, _id: uniqueId };
+    
+    const updatedUnsynced = [...unsyncedData, itemWithUniqueId];
     setUnsyncedData(updatedUnsynced);
     localStorage.setItem('agro_unsynced', JSON.stringify(updatedUnsynced));
 
     if (tipe === 'kas') {
-      const updatedKas = [newItem, ...kasList];
+      const updatedKas = [itemWithUniqueId, ...kasList];
       setKasList(updatedKas);
       localStorage.setItem('agro_kas', JSON.stringify(updatedKas));
     } else {
-      const updatedJadwal = [...jadwalList, newItem].sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+      const updatedJadwal = [...jadwalList, itemWithUniqueId].sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
       setJadwalList(updatedJadwal);
       localStorage.setItem('agro_jadwal', JSON.stringify(updatedJadwal));
     }
@@ -159,10 +208,10 @@ export default function JurnalTani() {
   // --- FUNGSI BUKU KAS ---
   const handleTambahKas = async (e) => {
     e.preventDefault();
-    if (!formKas.tanggal || !formKas.deskripsi || !formKas.nominal) return;
+    if (!formKas.tanggal || !formKas.deskripsi || !formKas.nominal || isSaving) return;
     
+    setIsSaving(true); // Kunci tombol agar tidak dobel klik
     const payload = {
-      _id: 'temp_' + Date.now().toString(),
       tipe: 'kas',
       jenis_kas: formKas.jenis_kas,
       tanggal: formKas.tanggal,
@@ -186,53 +235,16 @@ export default function JurnalTani() {
       toast.success('Tersimpan di HP (Mode Offline)');
     }
     setFormKas({ tanggal: '', deskripsi: '', nominal: '', jenis_kas: 'pengeluaran' });
+    setIsSaving(false); // Buka kunci tombol
   };
-
-  const hapusJurnal = async (id, tipe) => {
-    if(!window.confirm("Hapus catatan ini?")) return;
-    
-    if (id.startsWith('temp_')) {
-      const filteredUnsynced = unsyncedData.filter(item => item._id !== id);
-      setUnsyncedData(filteredUnsynced);
-      localStorage.setItem('agro_unsynced', JSON.stringify(filteredUnsynced));
-    } 
-    else if (isOnline) { 
-      try {
-        await axios.delete(`${import.meta.env.VITE_API_URL}/jurnal/${id}`, {
-          headers: { Authorization: `Bearer ${getToken()}` }
-        });
-      } catch (error) {
-        toast.error('Gagal menghapus dari cloud');
-        return; 
-      }
-    } else {
-      toast.error('Tidak bisa menghapus data Cloud saat Offline!');
-      return;
-    }
-
-    if(tipe === 'kas') {
-      const filtered = kasList.filter(item => item._id !== id);
-      setKasList(filtered);
-      localStorage.setItem('agro_kas', JSON.stringify(filtered));
-    } else {
-      const filtered = jadwalList.filter(item => item._id !== id);
-      setJadwalList(filtered);
-      localStorage.setItem('agro_jadwal', JSON.stringify(filtered));
-    }
-  };
-
-  // KALKULASI KEUANGAN
-  const totalPemasukan = kasList.filter(k => k.jenis_kas === 'pemasukan').reduce((acc, curr) => acc + curr.nominal, 0);
-  const totalPengeluaran = kasList.filter(k => k.jenis_kas !== 'pemasukan').reduce((acc, curr) => acc + curr.nominal, 0);
-  const saldoBersih = totalPemasukan - totalPengeluaran;
 
   // --- FUNGSI JADWAL TANI ---
   const handleTambahJadwal = async (e) => {
     e.preventDefault();
-    if (!formJadwal.tanggal || !formJadwal.kegiatan) return;
+    if (!formJadwal.tanggal || !formJadwal.kegiatan || isSaving) return;
 
+    setIsSaving(true); // Kunci tombol agar tidak dobel klik
     const payload = {
-      _id: 'temp_' + Date.now().toString(),
       tipe: 'jadwal',
       tanggal: formJadwal.tanggal,
       deskripsi: formJadwal.kegiatan,
@@ -254,6 +266,52 @@ export default function JurnalTani() {
       toast.success('Jadwal tersimpan di HP (Offline)');
     }
     setFormJadwal({ tanggal: '', kegiatan: '' });
+    setIsSaving(false); // Buka kunci tombol
+  };
+
+  const hapusJurnal = async (id, tipe) => {
+    if(!window.confirm("Hapus catatan ini?")) return;
+    
+    if (id.startsWith('temp_')) {
+      const filteredUnsynced = unsyncedData.filter(item => item._id !== id);
+      setUnsyncedData(filteredUnsynced);
+      localStorage.setItem('agro_unsynced', JSON.stringify(filteredUnsynced));
+      
+      if(tipe === 'kas') {
+        const filtered = kasList.filter(item => item._id !== id);
+        setKasList(filtered);
+        localStorage.setItem('agro_kas', JSON.stringify(filtered));
+      } else {
+        const filtered = jadwalList.filter(item => item._id !== id);
+        setJadwalList(filtered);
+        localStorage.setItem('agro_jadwal', JSON.stringify(filtered));
+      }
+      toast.success('Data offline dihapus');
+    } 
+    else if (isOnline) { 
+      try {
+        await axios.delete(`${import.meta.env.VITE_API_URL}/jurnal/${id}`, {
+          headers: { Authorization: `Bearer ${getToken()}` }
+        });
+        
+        if(tipe === 'kas') {
+          const filtered = kasList.filter(item => item._id !== id);
+          setKasList(filtered);
+          localStorage.setItem('agro_kas', JSON.stringify(filtered));
+        } else {
+          const filtered = jadwalList.filter(item => item._id !== id);
+          setJadwalList(filtered);
+          localStorage.setItem('agro_jadwal', JSON.stringify(filtered));
+        }
+        toast.success('Data dihapus dari cloud');
+      } catch (error) {
+        toast.error('Gagal menghapus dari cloud');
+        return; 
+      }
+    } else {
+      toast.error('Tidak bisa menghapus data Cloud saat Offline!');
+      return;
+    }
   };
 
   const toggleStatusJadwal = async (id, statusSaatIni) => {
@@ -275,10 +333,16 @@ export default function JurnalTani() {
     }
   };
 
+  // KALKULASI KEUANGAN
+  const totalPemasukan = kasList.filter(k => k.jenis_kas === 'pemasukan').reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalPengeluaran = kasList.filter(k => k.jenis_kas !== 'pemasukan').reduce((acc, curr) => acc + curr.nominal, 0);
+  const saldoBersih = totalPemasukan - totalPengeluaran;
+
   if (isLoading) {
     return <div className="min-h-screen flex justify-center items-center font-bold text-primary animate-pulse">Memuat Jurnal...</div>;
   }
 
+  // ✅ UI (JSX) SAMA PERSIS DENGAN KODE ANDA, HANYA TAMBAH KUNCI DI TOMBOL SIMPAN
   return (
     <div className="flex flex-col font-sans animate-fade-in pb-10 min-h-screen bg-gray-50/50 w-full">
       
@@ -313,7 +377,6 @@ export default function JurnalTani() {
             )}
           </div>
 
-          {/* TABS (Fluid Width) */}
           <div className="flex bg-gray-100 p-1.5 rounded-xl w-full sm:max-w-sm overflow-hidden">
             <button 
               onClick={() => setActiveTab('kas')}
@@ -331,18 +394,13 @@ export default function JurnalTani() {
         </div>
       </div>
 
-      {/* KONTEN UTAMA */}
       <div className="p-4 sm:p-6 lg:p-8 w-full max-w-5xl mx-auto flex-1">
         
-        {/* =========================================
-            TAB 1: BUKU KAS 
-            ========================================= */}
         {activeTab === 'kas' && (
           <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             <div className="lg:col-span-1 flex flex-col gap-6">
               
-              {/* KARTU SALDO BERSIH (Responsif & Anti-Bocor) */}
               <div className={`p-5 sm:p-6 rounded-3xl shadow-lg text-white relative overflow-hidden transition-colors duration-500 ${saldoBersih >= 0 ? 'bg-gradient-to-br from-green-600 to-primary' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
                 <DollarSign className="absolute right-[-20px] bottom-[-20px] opacity-10" size={120} />
                 <div className="relative z-10">
@@ -351,7 +409,6 @@ export default function JurnalTani() {
                     Rp {saldoBersih.toLocaleString('id-ID')}
                   </h2>
                   
-                  {/* Grid agar Pemasukan & Pengeluaran tidak tabrakan di HP kecil */}
                   <div className="grid grid-cols-2 gap-3 border-t border-white/20 pt-4 mt-2">
                      <div className="min-w-0">
                         <p className="text-[10px] text-white/70 uppercase truncate">Pemasukan</p>
@@ -365,7 +422,6 @@ export default function JurnalTani() {
                 </div>
               </div>
 
-              {/* FORM INPUT BUKU KAS */}
               <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm">
                 <h3 className="font-bold text-gray-800 mb-4 border-b border-gray-100 pb-2">Catat Transaksi Baru</h3>
                 <form onSubmit={handleTambahKas} className="flex flex-col gap-3">
@@ -391,14 +447,15 @@ export default function JurnalTani() {
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Nominal (Rp)</label>
                     <input type="number" min="1" value={formKas.nominal} onChange={(e) => setFormKas({...formKas, nominal: e.target.value})} placeholder="Contoh: 150000" className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-primary text-sm font-semibold text-gray-700" required />
                   </div>
-                  <button type="submit" className={`w-full mt-3 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md ${isOnline ? (formKas.jenis_kas === 'pemasukan' ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20') : 'bg-gray-800 hover:bg-black shadow-gray-800/20'}`}>
-                    <Plus size={18} /> {isOnline ? 'Simpan ke Cloud' : 'Simpan Sementara (Offline)'}
+                  
+                  {/* 👇 TOMBOL DISABLED SAAT PROSES SAVE */}
+                  <button type="submit" disabled={isSaving} className={`w-full mt-3 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md ${isSaving ? 'bg-gray-400 cursor-not-allowed' : isOnline ? (formKas.jenis_kas === 'pemasukan' ? 'bg-green-600 hover:bg-green-700 shadow-green-600/20' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20') : 'bg-gray-800 hover:bg-black shadow-gray-800/20'}`}>
+                    <Plus size={18} /> {isSaving ? 'Menyimpan...' : isOnline ? 'Simpan ke Cloud' : 'Simpan Sementara (Offline)'}
                   </button>
                 </form>
               </div>
             </div>
 
-            {/* DAFTAR RIWAYAT KAS (Responsif Mobile) */}
             <div className="lg:col-span-2">
               <div className="bg-white p-4 sm:p-6 rounded-3xl border border-gray-100 shadow-sm h-full min-h-[400px]">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
@@ -415,14 +472,12 @@ export default function JurnalTani() {
                 ) : (
                   <div className="flex flex-col gap-3">
                     {kasList.map((item) => (
-                      /* ITEM KAS: Flex Col di HP, Flex Row di PC agar tidak hancur */
                       <div key={item._id} className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-2xl transition group ${item._id.startsWith('temp_') ? 'border-yellow-200 bg-yellow-50' : 'border-gray-100 hover:bg-gray-50'}`}>
                         
                         <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0 mb-3 sm:mb-0">
                           <div className={`p-2.5 rounded-xl flex-shrink-0 mt-0.5 sm:mt-0 ${item.jenis_kas === 'pemasukan' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-500'}`}>
                              {item.jenis_kas === 'pemasukan' ? <TrendingUp size={18}/> : <TrendingDown size={18}/>}
                           </div>
-                          {/* min-w-0 wajib ada agar truncate jalan di flexbox */}
                           <div className="flex flex-col min-w-0">
                             <span className="text-gray-800 font-bold text-sm leading-tight truncate pr-2" title={item.deskripsi}>{item.deskripsi}</span>
                             <span className="text-gray-400 text-[11px] sm:text-xs mt-1 font-medium truncate">
@@ -431,7 +486,6 @@ export default function JurnalTani() {
                           </div>
                         </div>
 
-                        {/* Bagian Nominal & Tombol: Pindah ke bawah di HP, di kanan di Laptop */}
                         <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 flex-shrink-0 border-t sm:border-0 border-gray-100/50 pt-2 sm:pt-0 pl-14 sm:pl-0 w-full sm:w-auto mt-1 sm:mt-0">
                           <span className={`font-black text-sm md:text-base truncate ${item.jenis_kas === 'pemasukan' ? 'text-green-600' : 'text-orange-600'}`} title={`Rp ${item.nominal.toLocaleString('id-ID')}`}>
                             {item.jenis_kas === 'pemasukan' ? '+' : '-'} Rp {item.nominal.toLocaleString('id-ID')}
@@ -451,9 +505,6 @@ export default function JurnalTani() {
           </div>
         )}
 
-        {/* =========================================
-            TAB 2: JADWAL TANI 
-            ========================================= */}
         {activeTab === 'jadwal' && (
           <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1">
@@ -471,8 +522,10 @@ export default function JurnalTani() {
                     <label className="text-[10px] font-bold text-gray-500 uppercase">Kegiatan Tani</label>
                     <input type="text" value={formJadwal.kegiatan} onChange={(e) => setFormJadwal({...formJadwal, kegiatan: e.target.value})} placeholder="Contoh: Pemupukan NPK Pertama" className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-primary text-sm font-semibold text-gray-700" required />
                   </div>
-                  <button type="submit" className={`w-full mt-3 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md ${isOnline ? 'bg-primary hover:bg-green-700 shadow-primary/20' : 'bg-gray-800 hover:bg-black shadow-gray-800/20'}`}>
-                    <Plus size={18} /> {isOnline ? 'Simpan Agenda' : 'Simpan (Offline)'}
+                  
+                  {/* 👇 TOMBOL DISABLED SAAT PROSES SAVE */}
+                  <button type="submit" disabled={isSaving} className={`w-full mt-3 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition shadow-md ${isSaving ? 'bg-gray-400 cursor-not-allowed' : isOnline ? 'bg-primary hover:bg-green-700 shadow-primary/20' : 'bg-gray-800 hover:bg-black shadow-gray-800/20'}`}>
+                    <Plus size={18} /> {isSaving ? 'Menyimpan...' : isOnline ? 'Simpan Agenda' : 'Simpan (Offline)'}
                   </button>
                 </form>
               </div>

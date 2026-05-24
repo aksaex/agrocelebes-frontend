@@ -89,7 +89,7 @@ const handleSave = async (e) => {
   const loadingToast = toast.loading('Menyimpan perubahan...');
   
   try {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('user');
     const dataToSubmit = { ...formData, koordinat_lokasi: koordinat };
     
     const response = await axios.put(import.meta.env.VITE_API_URL + '/auth/profile', dataToSubmit, {

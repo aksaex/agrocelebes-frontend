@@ -36,6 +36,7 @@ axios.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // PERUBAHAN: Hapus HANYA data user, karena Token sudah bukan urusan localStorage
       localStorage.removeItem('user');
+      localStorage.removeItem('token');
       toast.error('Sesi Anda telah habis. Silakan login kembali.', { duration: 4000 });
       window.location.href = '/login'; 
     }

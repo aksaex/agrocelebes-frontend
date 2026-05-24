@@ -11,7 +11,7 @@ export default function StoreStatsWidget() {
   useEffect(() => {
     const fetchMyStats = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('user');
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/products/stats/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });

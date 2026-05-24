@@ -25,9 +25,11 @@ export default function Login() {
         const res = await axios.post(import.meta.env.VITE_API_URL + '/auth/google', { access_token: tokenResponse.access_token });
         if (res.data.isNewUser) {
           toast.dismiss(toastId);
-          setShowOnboarding(true); // Tampilkan Modal
+          setShowOnboarding(true); 
         } else {
-          localStorage.setItem('token', res.data.token);
+          // 👇 TAMBAHKAN BARIS INI KEMBALI
+          localStorage.setItem('token', res.data.token); 
+          
           localStorage.setItem('user', JSON.stringify(res.data.user));
           toast.success(`Selamat datang, ${res.data.user.nama}!`, { id: toastId });
           navigate('/dashboard');
@@ -54,8 +56,12 @@ const handleOnboardingSuccess = (data) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await axios.post(import.meta.env.VITE_API_URL + '/auth/login', { email, password });
-      localStorage.setItem('token', response.data.token);
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/auth/login`, { email, password });
+      
+      // 👇 TAMBAHKAN BARIS INI KEMBALI
+      localStorage.setItem('user', JSON.stringify(response.data.user)); 
+      navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
+      
       localStorage.setItem('user', JSON.stringify(response.data.user));
       navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (error) {

@@ -11,7 +11,7 @@ export default function ProductDetail() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('user');
     const user = JSON.parse(localStorage.getItem('user'));
     setUserLokal(user);
 
@@ -77,7 +77,7 @@ Apakah stok ${product.stok_kg} Kg masih tersedia?`;
     if (window.confirm("Apakah Anda yakin ingin menghapus produk ini secara permanen?")) {
       try {
         await axios.delete(`${import.meta.env.VITE_API_URL}/products/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('user')}` }
         });
         alert("Produk berhasil dihapus!");
         navigate('/pasar-b2b');

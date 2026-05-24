@@ -27,7 +27,7 @@ export default function Chatbot() {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('user');
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, 
         { pesan: pesanUser },
         { headers: { Authorization: `Bearer ${token}` } }

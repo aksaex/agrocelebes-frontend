@@ -20,7 +20,7 @@ export default function EditProduct() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('user');
     if (!token) navigate('/login');
     else fetchProductData(token);
   }, [id, navigate]);
@@ -64,11 +64,12 @@ export default function EditProduct() {
       await axios.put(`${import.meta.env.VITE_API_URL}/products/${id}`, formData, {
         headers: { 
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
+          Authorization: `Bearer ${localStorage.getItem('user')}` 
         }
       });
       toast.success("Data produk berhasil diperbarui!", { id: loadingToast });
-      navigate(`/product/${id}`);
+      navigate(`/product/${id}`, { replace: true });
+      navigate(-1);
     } catch (error) {
       toast.error("Gagal memperbarui produk.", { id: loadingToast });
     } finally {

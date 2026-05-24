@@ -22,7 +22,7 @@ export default function PasarB2B() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('user');
     const userData = localStorage.getItem('user');
     
     if (!token || !userData) {
@@ -52,7 +52,7 @@ export default function PasarB2B() {
 
   const handleApplyFilter = (e) => {
     e.preventDefault();
-    fetchProducts(localStorage.getItem('token'));
+    fetchProducts(localStorage.getItem('user'));
   };
 
   // LOGIKA PINTAR: Memfilter produk berdasarkan pembuatnya jika viewMode === 'saya'

@@ -12,7 +12,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     // Pengecekan keamanan sudah ditangani oleh ProtectedRoute di App.jsx
     // Jadi kita bisa langsung fokus mengambil data.
-    fetchUsers(localStorage.getItem('token'));
+    fetchUsers(localStorage.getItem('user'));
   }, []);
 
   const fetchUsers = async (token) => {
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
       const toastId = toast.loading('Menghapus pengguna dan data terkait...');
       try {
         await axios.delete(`${import.meta.env.VITE_API_URL}/admin/users/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${localStorage.getItem('user')}` }
         });
         toast.success(`Pengguna ${nama} berhasil dihapus!`, { id: toastId });
         setUsers(users.filter(u => u._id !== id)); // Hapus dari layar seketika

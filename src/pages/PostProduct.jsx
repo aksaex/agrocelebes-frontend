@@ -75,7 +75,7 @@ export default function PostProduct() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('user');
     
     if (!formData.lokasi_lahan) {
       toast.error("Mohon tekan tombol 'Gunakan GPS' untuk menentukan lokasi lahan!");
