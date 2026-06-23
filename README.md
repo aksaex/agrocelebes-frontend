@@ -1,18 +1,25 @@
-# React + Vite
+# 🌾 AgroCelebes - Frontend (Client Application)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AgroCelebes adalah platform *Direct-Trade B2B* dan ekosistem digital pertanian yang dirancang khusus untuk memutus rantai tengkulak di Sulawesi. Proyek ini dibangun dengan pendekatan *User-Centered Design* yang inklusif untuk petani lokal, serta dilengkapi asisten AI pintar.
 
-Currently, two official plugins are available:
+## 🚀 Fitur Utama Frontend
+- **Role-Based Dashboard:** Tampilan dinamis dan responsif untuk 3 entitas berbeda (Petani, Pembeli, Super Admin).
+- **Katalog B2B Real-Time:** Etalase komoditas dengan fitur pencarian dan filter cerdas.
+- **AI Penyuluh Widget:** Antarmuka Chatbot *floating* yang mendukung unggahan gambar (Multimodal) untuk mendeteksi penyakit tanaman.
+- **Jurnal Tani (PWA-Ready):** Pencatatan manajemen keuangan dan jadwal kebun yang mendukung sinkronisasi data (*offline-first design*).
+- **Google OAuth Login:** Autentikasi 1-klik yang sangat mudah untuk pengguna awam.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🛠️ Teknologi yang Digunakan
+- **Framework:** React.js + Vite (Cepat & Ringan)
+- **Styling:** Tailwind CSS (Desain Modern & Responsif)
+- **Routing:** React Router DOM
+- **HTTP Client:** Axios (Dilengkapi interceptor dan *withCredentials* untuk keamanan Cookie)
+- **Icons:** Lucide React
 
-## React Compiler
+## ⚙️ Cara Menjalankan di Komputer Lokal (Localhost)
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
-
-Note: This will impact Vite dev & build performances.
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. **Clone repositori ini:**
+   ```bash
+   git clone [https://github.com/aksaex/agrocelebes-frontend.git](https://github.com/aksaex/agrocelebes-frontend.git)
+   cd agrocelebes-frontend
+   
