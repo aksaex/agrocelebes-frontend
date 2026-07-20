@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Send, ImagePlus, Bot, X, Loader2, AlertCircle } from 'lucide-react';
+// PERBAIKAN: Menambahkan ikon Camera dari lucide-react
+import { Send, ImagePlus, Camera, Bot, X, Loader2, AlertCircle } from 'lucide-react';
 
 export default function AiPenyuluh() {
   const [pesan, setPesan] = useState('');
@@ -9,7 +10,6 @@ export default function AiPenyuluh() {
   const [loading, setLoading] = useState(false);
   const [sisaKuota, setSisaKuota] = useState(null);
   
-  // State default (akan tertimpa jika ada riwayat di database)
   const [chatHistory, setChatHistory] = useState([
     { 
       role: 'bot', 
@@ -19,12 +19,11 @@ export default function AiPenyuluh() {
   
   const chatEndRef = useRef(null);
 
-  // 1. MENGAMBIL RIWAYAT CHAT DARI DATABASE SAAT HALAMAN DIBUKA
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         const res = await axios.get(`${import.meta.env.VITE_API_URL}/chat/history`, {
-          withCredentials: true // Wajib agar Cookie Token terkirim ke backend!
+          withCredentials: true 
         });
         
         if (res.data && res.data.length > 0) {
@@ -38,7 +37,6 @@ export default function AiPenyuluh() {
     fetchHistory();
   }, []);
 
-  // Auto-scroll ke bawah setiap ada pesan baru
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
@@ -74,21 +72,18 @@ export default function AiPenyuluh() {
       if (pesanUser) formData.append('pesan', pesanUser);
       if (image) formData.append('image', image);
 
-      // 2. KIRIM PESAN KE BACKEND (Dilengkapi dengan kredensial Cookie)
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/chat`, formData, { 
-        withCredentials: true, // Wajib agar tidak error "Gangguan Server"
+        withCredentials: true, 
         headers: { 'Content-Type': 'multipart/form-data' } 
       });
 
       setChatHistory(prev => [...prev, { role: 'bot', text: response.data.balasan }]);
       
-      // Update sisa kuota jika backend mengirimkannya
       if (response.data.sisaKuota !== undefined) {
         setSisaKuota(response.data.sisaKuota);
       }
       
     } catch (error) {
-      // 3. TANGKAP ERROR KUOTA HABIS DARI BACKEND
       const errorMessage = error.response?.data?.balasan || 'Maaf, saya sedang mengalami gangguan koneksi ke server pusat. Silakan coba lagi.';
       setChatHistory(prev => [...prev, { role: 'bot', text: errorMessage }]);
     } finally {
@@ -99,7 +94,6 @@ export default function AiPenyuluh() {
   return (
     <div className="flex flex-col absolute inset-0 bg-gray-50 font-sans animate-fade-in">
       
-      {/* HEADER INFORMASI KUOTA (Opsional, muncul jika sisaKuota terdeteksi) */}
       {sisaKuota !== null && (
         <div className="bg-green-100 text-green-800 text-xs font-bold py-2 px-4 flex items-center justify-center gap-2 shadow-sm z-20">
           <AlertCircle size={14} /> 
@@ -161,17 +155,35 @@ export default function AiPenyuluh() {
             </div>
           )}
 
-          <form onSubmit={kirimPesan} className="flex items-end gap-2 bg-gray-50 border border-gray-200 p-2 rounded-2xl focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-inner">
+          <form onSubmit={kirimPesan} className="flex items-end gap-1.5 bg-gray-50 border border-gray-200 p-2 rounded-2xl focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all shadow-inner">
             
-            <label className="p-3 text-gray-400 hover:text-primary hover:bg-green-50 rounded-xl cursor-pointer transition">
-              <ImagePlus size={24} />
-              <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+            {/* AMBIL FOTO LANGSUNG DARI KAMERA HP */}
+            <label className="p-2.5 text-gray-400 hover:text-primary hover:bg-green-50 rounded-xl cursor-pointer transition flex-shrink-0">
+              <Camera size={22} />
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                className="hidden" 
+                onChange={handleImageChange} 
+              />
+            </label>
+
+            {/* PILIH DARI GALERI HP */}
+            <label className="p-2.5 text-gray-400 hover:text-primary hover:bg-green-50 rounded-xl cursor-pointer transition flex-shrink-0">
+              <ImagePlus size={22} />
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleImageChange} 
+              />
             </label>
 
             <textarea 
               value={pesan}
               onChange={(e) => setPesan(e.target.value)}
-              placeholder="Ketik keluhan tanaman atau unggah foto..." 
+              placeholder="Tulis pesan atau ambil foto..." 
               className="flex-1 bg-transparent border-none outline-none resize-none max-h-32 min-h-[44px] py-3 text-gray-800 text-[15px]"
               rows="1"
               onInput={(e) => {
@@ -189,7 +201,7 @@ export default function AiPenyuluh() {
             <button 
               type="submit" 
               disabled={loading || (!pesan.trim() && !image)}
-              className="p-3 bg-primary text-white rounded-xl font-bold hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors shadow-md mb-0.5"
+              className="p-3 bg-primary text-white rounded-xl font-bold hover:bg-green-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed transition-colors shadow-md mb-0.5 flex-shrink-0"
             >
               <Send size={20} />
             </button>

@@ -3,14 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { 
   LayoutDashboard, 
-  Store, 
   MessageSquare, 
   LogOut, 
   Menu, 
   User, 
   Calculator,
   BookOpen,
-  Users // Tambahan icon untuk 
+  Users,
+  ShieldCheck
 } from 'lucide-react';
 
 export default function MainLayout({ children }) {
@@ -20,6 +20,15 @@ export default function MainLayout({ children }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   
   const user = JSON.parse(localStorage.getItem('user'));
+  
+  const dashboardPathByRole = {
+    petani: '/petani/dashboard',
+    kud: '/kud/dashboard',
+    pabrik: '/pabrik/dashboard',
+    kios: '/kios/dashboard',
+    logistik: '/logistik/dashboard', 
+    admin: '/admin/dashboard'
+  };
 
   const handleLogout = async () => {
     try {
@@ -54,35 +63,24 @@ export default function MainLayout({ children }) {
         } flex flex-col`}
       >
         {/* Logo Area */}
-        <div className="p-6 flex items-center gap-3 border-b border-gray-100 flex-shrink-0">
+        <div className="p-6 flex items-center gap-3 border-b border-green-100 flex-shrink-0">
           <img src="/logo.png" alt="Logo" className="h-8" />
-          <span className="text-xl font-extrabold text-primary tracking-tight">AgroCelebes</span>
+          <span className="text-xl font-extrabold text-green-900 tracking-tight">AgroCelebes</span>
         </div>
         
         {/* Navigasi Utama */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           
-          {/* MENU UMUM (Bisa diakses Admin, Petani, Pembeli) */}
+          {/* MENU UMUM (Dashboard Utama masing-masing Role) */}
           <button 
-            onClick={() => { navigate('/dashboard'); setIsSidebarOpen(false); }} 
+            onClick={() => { navigate(dashboardPathByRole[user.role] || '/dashboard'); setIsSidebarOpen(false); }} 
             className={`w-full flex items-center gap-3 p-3 rounded-xl transition font-semibold ${
-              isActive('/dashboard') || isActive('/petani/dashboard') || isActive('/pembeli/dashboard') || isActive('/admin/dashboard')
-                ? 'bg-green-50 text-primary' 
+              isActive('/dashboard') || isActive('/petani/dashboard') || isActive('/admin/dashboard') || isActive('/kud/dashboard') || isActive('/pabrik/dashboard') || isActive('/kios/dashboard') || isActive('/logistik/dashboard')
+                ? 'bg-blue-50 text-blue-700' 
                 : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            <LayoutDashboard size={20} /> Dashboard
-          </button>
-          
-          <button 
-            onClick={() => { navigate('/pasar-b2b'); setIsSidebarOpen(false); }} 
-            className={`w-full flex items-center gap-3 p-3 rounded-xl transition font-semibold ${
-              isActive('/pasar-b2b') || isActive('/post-product') 
-                ? 'bg-green-50 text-primary' 
-                : 'text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            <Store size={20} /> Pasar B2B
+            <LayoutDashboard size={20} /> Dashboard Utama
           </button>
 
           {/* MENU EKSKLUSIF ADMIN */}
@@ -93,7 +91,7 @@ export default function MainLayout({ children }) {
                 isActive('/admin/users') ? 'bg-red-50 text-red-600' : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Users size={20} /> Control Panel
+              <Users size={20} /> Pengawasan BPD
             </button>
           )}
           
@@ -103,7 +101,7 @@ export default function MainLayout({ children }) {
               <button 
                 onClick={() => { navigate('/ai-penyuluh'); setIsSidebarOpen(false); }} 
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition font-semibold ${
-                  isActive('/ai-penyuluh') ? 'bg-green-50 text-primary' : 'text-gray-600 hover:bg-gray-50'
+                  isActive('/ai-penyuluh') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
                 <MessageSquare size={20} /> AI Penyuluh
@@ -112,22 +110,32 @@ export default function MainLayout({ children }) {
               <button 
                 onClick={() => { navigate('/kalkulator'); setIsSidebarOpen(false); }} 
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition font-semibold ${
-                  isActive('/kalkulator') ? 'bg-green-50 text-primary' : 'text-gray-600 hover:bg-gray-50'
+                  isActive('/kalkulator') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <Calculator size={20} /> Kalkulator Cerdas
+                <Calculator size={20} /> Analisis Risiko
               </button>
 
               <button 
                 onClick={() => { navigate('/jurnal'); setIsSidebarOpen(false); }} 
                 className={`w-full flex items-center gap-3 p-3 rounded-xl transition font-semibold ${
-                  isActive('/jurnal') ? 'bg-green-50 text-primary' : 'text-gray-600 hover:bg-gray-50'
+                  isActive('/jurnal') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                <BookOpen size={20} /> Buku Tani Pintar
+                <BookOpen size={20} /> Buku Tani
               </button>
             </>
           )}
+
+          {/* INDIKATOR KEAMANAN (Menambah Trust Juri Bank) */}
+          <div className="mt-8 p-4 bg-green-50 border border-green-200 rounded-xl">
+             <div className="flex items-center gap-2 text-green-700 font-bold text-sm mb-1">
+                <ShieldCheck size={16} /> 
+                Dilindungi BPD
+             </div>
+             <p className="text-xs text-green-600">Sistem Escrow Terverifikasi</p>
+          </div>
+
         </nav>
       </aside>
 
@@ -135,23 +143,20 @@ export default function MainLayout({ children }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         
         {/* TOPBAR */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 z-30 flex-shrink-0">
+        <header className="bg-white border-b border-green-200 h-16 flex items-center justify-between px-4 sm:px-6 z-30 flex-shrink-0">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(true)} 
-              className="lg:hidden text-gray-500 hover:text-primary transition"
+              className="lg:hidden text-green-500 hover:text-green-700 transition"
             >
               <Menu size={24} />
             </button>
             
-            <h1 className="font-bold text-gray-800 text-lg hidden sm:block">
-              {isActive('/petani/dashboard') || isActive('/admin/dashboard') || isActive('/dashboard') ? 'Dashboard Utama'
-                : isActive('/pembeli/dashboard') ? 'Dashboard Pembeli'
-                : isActive('/admin/users') ? 'Control Panel' // Tambahan title
-                : isActive('/pasar-b2b') ? 'Katalog B2B' 
-                : isActive('/post-product') ? 'Posting Komoditas'
+            <h1 className="font-bold text-green-800 text-lg hidden sm:block">
+              {isActive('/petani/dashboard') || isActive('/admin/dashboard') || isActive('/dashboard') || isActive('/kud/dashboard') || isActive('/pabrik/dashboard') || isActive('/kios/dashboard') || isActive('/logistik/dashboard') ? 'Pusat Kendali Fintech'
+                : isActive('/admin/users') ? 'Dashboard Pengawasan BPD' 
                 : isActive('/ai-penyuluh') ? 'AI Penyuluh Pintar' 
-                : isActive('/kalkulator') ? 'Kalkulator Cerdas' 
+                : isActive('/kalkulator') ? 'Analisis Risiko Pra-Panen' 
                 : isActive('/jurnal') ? 'Buku Tani Pintar' 
                 : 'AgroCelebes'}
             </h1>
@@ -163,7 +168,7 @@ export default function MainLayout({ children }) {
               onClick={() => setIsProfileOpen(!isProfileOpen)} 
               className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 hover:shadow-sm transition"
             >
-              <div className="w-7 h-7 bg-primary rounded-full flex items-center justify-center text-white font-bold text-xs uppercase shadow-inner">
+              <div className="w-7 h-7 bg-blue-800 rounded-full flex items-center justify-center text-white font-bold text-xs uppercase shadow-inner">
                 {user.nama.charAt(0)}
               </div>
               <span className="text-sm font-semibold hidden md:block text-gray-700 truncate max-w-[120px]">
@@ -178,7 +183,7 @@ export default function MainLayout({ children }) {
                 </div>
                 <button 
                   onClick={() => { navigate('/profile'); setIsProfileOpen(false); }} 
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary flex items-center gap-2 transition"
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-700 flex items-center gap-2 transition"
                 >
                   <User size={16} /> Profil Saya
                 </button>

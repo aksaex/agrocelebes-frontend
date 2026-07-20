@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
-import { MapPin, Building, User, Mail, Lock, Phone, Sprout, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { MapPin, Building, User, Mail, Lock, Phone, Sprout, ArrowRight, CheckCircle2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useGoogleLogin } from '@react-oauth/google';
 import OnboardingModal from '../components/OnboardingModal'; 
@@ -22,8 +22,14 @@ export default function Register() {
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleRoleChange = (selectedRole) => {
-    setFormData({ ...formData, role: selectedRole, nama_perusahaan: selectedRole === 'petani' ? '' : formData.nama_perusahaan });
+  // Update: Mengkosongkan nama_perusahaan hanya jika role-nya 'petani'
+  const handleRoleChange = (e) => {
+    const selectedRole = e.target.value;
+    setFormData({ 
+      ...formData, 
+      role: selectedRole, 
+      nama_perusahaan: selectedRole === 'petani' ? '' : formData.nama_perusahaan 
+    });
   };
 
   const handleGoogleLogin = useGoogleLogin({
@@ -44,7 +50,6 @@ export default function Register() {
           setShowOnboarding(true); 
         } else {
           // Jika ternyata user sudah punya akun, langsung login-kan
-          if (res.data.token) localStorage.setItem('token', res.data.token);
           localStorage.setItem('user', JSON.stringify(res.data.user));
           toast.success(`Selamat datang kembali, ${res.data.user.nama}!`, { id: toastId });
           navigate('/dashboard');
@@ -60,10 +65,6 @@ export default function Register() {
   });
 
   const handleOnboardingSuccess = (data) => {
-    // ✅ PERBAIKAN: Aktifkan penyimpanan token jika backend Anda mengirimkannya
-    if (data.token) {
-      localStorage.setItem('token', data.token);
-    }
     localStorage.setItem('user', JSON.stringify(data.user));
     setShowOnboarding(false);
     toast.success("Profil berhasil dilengkapi!");
@@ -127,7 +128,7 @@ export default function Register() {
             <Sprout className="text-primary" size={36} />
           </div>
           <h2 className="text-3xl font-extrabold text-gray-900 mb-3 leading-tight">Buat Akun<br/>AgroCelebes</h2>
-          <p className="text-gray-500 text-sm mb-6">Bergabunglah dengan ekosistem pertanian Sulawesi.</p>
+          <p className="text-gray-500 text-sm mb-6">Bergabunglah dengan ekosistem pertanian.</p>
           <div className="hidden md:block w-16 h-1 bg-primary rounded-full mb-6"></div>
           <p className="hidden md:block text-sm text-gray-600 font-medium">
             Sudah punya akun? <br/>
@@ -141,37 +142,48 @@ export default function Register() {
         <div className="w-full md:w-7/12 bg-gray-50/50 p-6 sm:p-8 rounded-3xl border border-gray-100 shadow-inner">
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             
-            {/* Role Switcher */}
-            <div className="grid grid-cols-2 gap-3">
-              <button type="button" onClick={() => handleRoleChange('petani')} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.role === 'petani' ? 'border-primary bg-green-50 text-primary shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
-                <Sprout size={20} /> <span className="font-bold text-sm">Petani</span>
-              </button>
-              <button type="button" onClick={() => handleRoleChange('pembeli')} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all ${formData.role === 'pembeli' ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-sm' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'}`}>
-                <Building size={20} /> <span className="font-bold text-sm">Pembeli</span>
-              </button>
+            {/* 🟢 PERBAIKAN: Role Switcher menggunakan Select Dropdown (5 Role) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Daftar Sebagai Peran</label>
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
+                <Users className="text-gray-400 mr-3" size={18} />
+                <select 
+                  name="role"
+                  value={formData.role}
+                  onChange={handleRoleChange}
+                  className="w-full bg-transparent outline-none text-sm font-medium text-gray-700 cursor-pointer appearance-none"
+                >
+                  <option value="petani">👨‍🌾 Petani Lokal (Lahan Gurem)</option>
+                  <option value="kud">💻 Koperasi Unit Desa (KUD Agregator)</option>
+                  <option value="pabrik">🏢 Pabrik Offtaker (Pembeli Skala B2B)</option>
+                  <option value="kios">🏪 Kios Pupuk Mitra (Saprotan Closed-Loop)</option>
+                  <option value="logistik">🚚 Vendor Logistik / Pengangkut</option>
+                </select>
+              </div>
             </div>
 
-            {formData.role === 'pembeli' && (
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-blue-500 transition">
+            {/* 🟢 Update Logika: Input Perusahaan muncul jika role bukan 'petani' */}
+            {formData.role !== 'petani' && (
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-blue-500 transition shadow-sm">
                 <Building className="text-gray-400 mr-3" size={18} />
-                <input type="text" name="nama_perusahaan" placeholder="Nama Perusahaan" required onChange={handleChange} className="w-full bg-transparent outline-none text-sm font-medium text-gray-700" />
+                <input type="text" name="nama_perusahaan" placeholder="Nama Perusahaan / Instansi" required onChange={handleChange} className="w-full bg-transparent outline-none text-sm font-medium text-gray-700" />
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
                 <User className="text-gray-400 mr-3" size={18} />
                 <input type="text" name="nama" placeholder="Nama Lengkap" required minLength="3" onChange={handleChange} className="w-full bg-transparent outline-none text-sm font-medium text-gray-700" />
               </div>
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition">
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
                 <Mail className="text-gray-400 mr-3" size={18} />
                 <input type="email" name="email" placeholder="Email Aktif" required onChange={handleChange} className="w-full bg-transparent outline-none text-sm font-medium text-gray-700" />
               </div>
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition">
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
                 <Lock className="text-gray-400 mr-3" size={18} />
                 <input type="password" name="password" placeholder="Buat Password" required onChange={handleChange} className="w-full bg-transparent outline-none text-sm font-medium text-gray-700" />
               </div>
-              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition">
+              <div className="flex items-center bg-white border border-gray-200 rounded-xl p-3 focus-within:border-primary transition shadow-sm">
                 <Phone className="text-gray-400 mr-3" size={18} />
                 <input 
                   type="tel" name="no_hp" placeholder="Nomor WhatsApp" required maxLength="15"
@@ -183,7 +195,7 @@ export default function Register() {
             </div>
             
             <div className="flex gap-2">
-              <div className={`flex-1 flex items-center bg-white border rounded-xl p-3 transition ${koordinat ? 'border-green-500 bg-green-50' : 'border-gray-200 focus-within:border-primary'}`}>
+              <div className={`flex-1 flex items-center bg-white border rounded-xl p-3 transition shadow-sm ${koordinat ? 'border-green-500 bg-green-50' : 'border-gray-200 focus-within:border-primary'}`}>
                 <MapPin className={`${koordinat ? 'text-green-500' : 'text-gray-400'} mr-3 flex-shrink-0`} size={18} />
                 <input type="text" name="alamat" value={formData.alamat} placeholder="Klik Tombol GPS" required readOnly className="w-full bg-transparent outline-none text-sm font-medium text-gray-700 truncate cursor-not-allowed" />
               </div>
@@ -217,7 +229,7 @@ export default function Register() {
       <OnboardingModal 
         isOpen={showOnboarding} 
         googleAccessToken={googleAccessToken} 
-        defaultRole={formData.role} // ✅ Mengambil role yang sudah dipilih di UI
+        defaultRole={formData.role}
         onSuccess={handleOnboardingSuccess} 
       />
     </div>

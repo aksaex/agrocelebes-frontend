@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { MapPin, Building, Phone, Sprout, CheckCircle2 } from 'lucide-react';
+import { MapPin, Building, Phone, CheckCircle2, Users } from 'lucide-react'; // Ditambahkan Users
 import toast from 'react-hot-toast';
 
 export default function OnboardingModal({ isOpen, googleAccessToken, defaultRole = 'petani', onSuccess }) {
@@ -12,6 +12,17 @@ export default function OnboardingModal({ isOpen, googleAccessToken, defaultRole
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
+
+  // Fungsi dinamis untuk mengubah teks placeholder sesuai peran
+  const getCompanyPlaceholder = (role) => {
+    switch (role) {
+      case 'kios': return 'Nama Kios (Misal: Kios Tani Jaya)';
+      case 'kud': return 'Nama Koperasi (KUD)';
+      case 'logistik': return 'Nama Vendor / Ekspedisi';
+      case 'pabrik': return 'Nama Perusahaan / Instansi';
+      default: return 'Nama Perusahaan';
+    }
+  };
 
   const dapatkanLokasi = () => {
     setIsLocating(true);
@@ -69,7 +80,7 @@ export default function OnboardingModal({ isOpen, googleAccessToken, defaultRole
       onSuccess(res.data);
       toast.success(`Akun berhasil dibuat! Selamat datang, ${res.data.user.nama}!`, { id: toastId });
     } catch (err) {
-      toast.error('Gagal mengirim data tambahan(nomor sudah ada).', { id: toastId });
+      toast.error('Gagal mengirim data tambahan (nomor sudah ada).', { id: toastId });
     } finally {
       setLoading(false);
     }
@@ -84,19 +95,42 @@ export default function OnboardingModal({ isOpen, googleAccessToken, defaultRole
         </div>
 
         <form onSubmit={handleOnboardingSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setOnboardingData({...onboardingData, role: 'petani'})} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition font-bold text-xs ${onboardingData.role === 'petani' ? 'border-primary bg-green-50 text-primary' : 'border-gray-200 bg-white text-gray-500'}`}>
-              <Sprout size={16} /> Petani
-            </button>
-            <button type="button" onClick={() => setOnboardingData({...onboardingData, role: 'pembeli'})} className={`flex items-center justify-center gap-2 p-3 rounded-xl border-2 transition font-bold text-xs ${onboardingData.role === 'pembeli' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-gray-200 bg-white text-gray-500'}`}>
-              <Building size={16} /> Pembeli
-            </button>
+          
+          {/* Dropdown Pemilihan Peran (Mendukung 5 Peran) */}
+          <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-3 focus-within:bg-white focus-within:border-primary transition">
+            <Users size={18} className="text-gray-400 mr-2" />
+            <select 
+              value={onboardingData.role}
+              onChange={(e) => {
+                const selectedRole = e.target.value;
+                setOnboardingData({
+                  ...onboardingData, 
+                  role: selectedRole,
+                  // Kosongkan nama perusahaan jika beralih kembali ke petani
+                  nama_perusahaan: selectedRole === 'petani' ? '' : onboardingData.nama_perusahaan
+                });
+              }}
+              className="bg-transparent outline-none w-full text-xs font-semibold text-gray-700 cursor-pointer appearance-none"
+            >
+              <option value="petani">👨‍🌾 Petani Lokal (Lahan Gurem)</option>
+              <option value="kud">💻 Koperasi Unit Desa (KUD)</option>
+              <option value="pabrik">🏢 Pabrik Offtaker</option>
+              <option value="kios">🏪 Kios Pupuk Mitra</option>
+              <option value="logistik">🚚 Vendor Logistik / Ekspedisi</option>
+            </select>
           </div>
 
-          {onboardingData.role === 'pembeli' && (
+          {/* Munculkan input ini hanya jika peran BUKAN petani */}
+          {onboardingData.role !== 'petani' && (
             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-xl p-3 focus-within:bg-white transition">
               <Building size={18} className="text-gray-400 mr-2" />
-              <input type="text" placeholder="Nama Perusahaan" required onChange={(e) => setOnboardingData({...onboardingData, nama_perusahaan: e.target.value})} className="bg-transparent outline-none w-full text-xs font-semibold text-gray-700" />
+              <input 
+                type="text" 
+                placeholder={getCompanyPlaceholder(onboardingData.role)} 
+                required 
+                onChange={(e) => setOnboardingData({...onboardingData, nama_perusahaan: e.target.value})} 
+                className="bg-transparent outline-none w-full text-xs font-semibold text-gray-700" 
+              />
             </div>
           )}
 

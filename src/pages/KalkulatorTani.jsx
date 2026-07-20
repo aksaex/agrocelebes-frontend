@@ -4,7 +4,7 @@ import { Calculator, AlertCircle, RefreshCw, Sprout, HandCoins, PackageOpen, Cal
 export default function KalkulatorTani() {
   const [komoditas, setKomoditas] = useState('jagung');
   const [luasLahan, setLuasLahan] = useState('');
-  const [bulanTanam, setBulanTanam] = useState('januari'); // State baru untuk bulan
+  const [bulanTanam, setBulanTanam] = useState('januari'); 
   
   const [hasil, setHasil] = useState(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -29,14 +29,14 @@ export default function KalkulatorTani() {
       hasil_panen_ha: 6000,
       harga_jual_estimasi: 6500
     },
-    kakao: {
-      nama: 'Kakao (Peremajaan/Baru)',
-      bibit_per_ha: 1000, // pohon
-      harga_bibit: 10000, // Rp/pohon
-      npk_per_ha: 400, // kg (untuk masa produktif)
+    kacang_tanah: {
+      nama: 'Kacang Tanah',
+      bibit_per_ha: 100, // kg benih kupas
+      harga_bibit: 25000, // Rp/kg
+      npk_per_ha: 150, // kg (Kacang-kacangan butuh lebih sedikit N)
       harga_npk: 15000,
-      hasil_panen_ha: 1500, // kg biji kering (estimasi produktif penuh)
-      harga_jual_estimasi: 120000 // Rp/kg
+      hasil_panen_ha: 2500, // kg polong basah
+      harga_jual_estimasi: 12000 // Rp/kg
     }
   };
 
@@ -73,12 +73,15 @@ export default function KalkulatorTani() {
         status = "aman";
       }
     }
-    else if (komoditas === 'kakao') {
-      if (kemarau.includes(bulan)) {
-        rekomendasi = "Jangan Tanam Bibit Baru! Memindahkan bibit kakao ke lahan pada musim kemarau akan menyebabkan tingkat kematian bibit (stres air) di atas 60%. Tunda hingga musim hujan tiba.";
+    else if (komoditas === 'kacang_tanah') {
+      if (hujan.includes(bulan)) {
+        rekomendasi = "Waspada Genangan Air! Kacang tanah sangat rentan mengalami busuk akar dan polong jika tanah terlalu basah atau tergenang. Wajib membuat bedengan atau saluran drainase yang sangat baik jika memaksakan tanam.";
+        status = "waspada";
+      } else if (puncakKemarau.includes(bulan)) {
+        rekomendasi = "Risiko Gagal Kecambah! Menanam di puncak kemarau membuat benih kacang sulit tumbuh karena tanah terlalu kering dan keras. Harus dipastikan ada pengairan awal yang cukup.";
         status = "bahaya";
       } else {
-        rekomendasi = "Waktu Pemindahan Ideal. Curah hujan membantu bibit kakao beradaptasi di lahan baru. Pastikan tanaman pelindung (naungan) sudah siap agar daun muda tidak terbakar matahari.";
+        rekomendasi = "Waktu Tanam Ideal! Kelembapan tanah cukup untuk awal pertumbuhan, dan cuaca yang lebih kering saat masa panen nanti akan sangat memudahkan pencabutan serta pengeringan polong.";
         status = "aman";
       }
     }
@@ -127,7 +130,7 @@ export default function KalkulatorTani() {
       });
       
       setIsCalculating(false);
-    }, 1000); // Sedikit diperlama agar efek "AI Berpikir" terasa
+    }, 1000); 
   };
 
   return (
@@ -150,7 +153,7 @@ export default function KalkulatorTani() {
             >
               <option value="jagung">🌽 Jagung Hibrida</option>
               <option value="padi">🌾 Padi Sawah</option>
-              <option value="kakao">🍫 Kakao (Biji Kering)</option>
+              <option value="kacang_tanah">🥜 Kacang Tanah</option>
             </select>
             
             {/* Input Bulan Rencana Tanam (Baru) */}
@@ -225,7 +228,7 @@ export default function KalkulatorTani() {
               </div>
             </div>
 
-            {/* KOTAK REKOMENDASI AI (BARU) */}
+            {/* KOTAK REKOMENDASI AI */}
             <div className={`mb-6 p-5 sm:p-6 rounded-3xl border-2 flex items-start gap-4 shadow-sm ${
               hasil.aiAnalysis.status === 'bahaya' ? 'bg-red-50 border-red-200' :
               hasil.aiAnalysis.status === 'waspada' ? 'bg-yellow-50 border-yellow-200' :
@@ -265,7 +268,7 @@ export default function KalkulatorTani() {
                   <div>
                     <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-widest font-bold mb-1">Bibit / Benih</p>
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end border-b border-gray-50 pb-2 gap-1 sm:gap-0">
-                      <span className="text-lg md:text-xl font-black text-gray-800 break-words">{hasil.totalBibit.toLocaleString('id-ID')} <span className="text-xs sm:text-sm font-medium text-gray-400">{komoditas === 'kakao' ? 'Pohon' : 'Kg'}</span></span>
+                      <span className="text-lg md:text-xl font-black text-gray-800 break-words">{hasil.totalBibit.toLocaleString('id-ID')} <span className="text-xs sm:text-sm font-medium text-gray-400">Kg</span></span>
                       <span className="text-sm md:text-base font-bold text-orange-600 break-words">Rp {hasil.biayaBibit.toLocaleString('id-ID')}</span>
                     </div>
                   </div>

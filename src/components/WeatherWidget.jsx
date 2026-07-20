@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-// PERBAIKAN: AlertCircle sudah ditambahkan di sini!
-import { CloudRain, Sun, Cloud, Thermometer, Droplets, Wind, RefreshCcw, MapPin, AlertCircle } from 'lucide-react';
+import { CloudRain, Sun, Cloud, Droplets, Wind, MapPin, AlertCircle } from 'lucide-react';
 
 export default function WeatherWidget() {
   const [weatherData, setWeatherData] = useState(null);
@@ -12,7 +11,6 @@ export default function WeatherWidget() {
   const kodeWilayahBMKG = {
     "Makassar": "73.71.11.1001",
     "Barru": "73.11.04.1001", 
-    "Parepare": "73.72.01.1001", // Kode Parepare (Kec. Bacukiki)
     "Bone": "73.08.08.1001",
     "Gowa": "73.08.08.1001",
     "Maros": "73.09.01.1001",
@@ -27,7 +25,8 @@ export default function WeatherWidget() {
             return { kode, namaKota: kota };
         }
     }
-    return { kode: "73.71.11.1001", namaKota: "Makassar (Default)" };
+    // UBAH DISINI: Default dikembalikan ke Barru
+    return { kode: "73.11.04.1001", namaKota: "Barru (Default)" };
   };
 
   const inisialisasiCuaca = () => {
@@ -46,11 +45,21 @@ export default function WeatherWidget() {
             const { kode, namaKota } = cariKodeWilayah(alamat);
             setLokasiTerdeteksi(namaKota);
 
-            const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=${kode}`);
-            setWeatherData(response.data);
+            // mencoba mengambil data wilayah terdeteksi
+            try {
+              const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=${kode}`);
+              setWeatherData(response.data);
+            } catch (apiErr) {
+              // UBAH DISINI: Fallback dialihkan ke Barru jika wilayah lain error
+              console.warn(`Kode wilayah ${kode} (${namaKota}) direspons error oleh BMKG. Mengalihkan ke data resmi terdekat.`);
+              
+              const fallbackResponse = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=73.11.04.1001`);
+              setWeatherData(fallbackResponse.data);
+              setLokasiTerdeteksi(`${namaKota} (Menggunakan Stasiun BMKG Barru)`);
+            }
 
           } catch (err) {
-             setError('Gagal sinkronisasi data BMKG.');
+             setError(err.response?.data?.message || 'Gagal sinkronisasi data BMKG. Periksa koneksi internet server Anda.');
           } finally {
             setLoading(false);
           }
@@ -69,10 +78,11 @@ export default function WeatherWidget() {
 
   const muatCuacaDefault = async () => {
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=73.71.11.1001`);
+      // UBAH DISINI: Mengambil default cuaca Barru jika akses GPS ditolak
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=73.11.04.1001`);
       setWeatherData(response.data);
     } catch (err) {
-      setError('Gagal memuat cuaca dari server.');
+      setError(err.response?.data?.message || 'Gagal memuat cuaca dari server.');
     } finally {
       setLoading(false);
     }
@@ -85,7 +95,7 @@ export default function WeatherWidget() {
   const getWeatherIcon = (desc) => {
     const d = desc?.toLowerCase() || '';
     if (d.includes('hujan')) return <CloudRain className="text-blue-500 animate-pulse" size={32} />;
-    if (d.includes('cerah')) return <Sun className="text-yellow-500 animate-spin-slow" size={32} />;
+    if (d.includes('cerah')) return <Sun className="text-yellow-500" size={32} />;
     return <Cloud className="text-gray-400" size={32} />;
   };
 
@@ -93,7 +103,7 @@ export default function WeatherWidget() {
     return (
       <div className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex justify-center items-center h-[200px]">
          <div className="flex flex-col items-center text-gray-400">
-           <MapPin className="animate-bounce mb-3 text-primary" size={28} />
+           <MapPin className="animate-bounce mb-3 text-green-600" size={28} />
            <p className="text-xs font-bold uppercase tracking-wider">Melacak Titik Koordinat...</p>
          </div>
       </div>
@@ -110,28 +120,32 @@ export default function WeatherWidget() {
     );
   }
 
-  const prakiraanSekarang = weatherData.data[0].cuaca[0][0]; 
+  // AMBIL DATA ARRAY CUACA MULTI-HARI
+  const prakiraanHarian = weatherData.data[0].cuaca; 
+  const prakiraanSekarang = prakiraanHarian[0][0]; 
   const lokasiResmiBMKG = weatherData.lokasi; 
 
   return (
     <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-3xl shadow-sm border border-blue-100 relative overflow-hidden group h-full flex flex-col">
       <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all"></div>
       
-<div className="flex justify-between items-center mb-6 relative z-10">
-  <div className="min-w-0">
-    <h3 className="font-bold text-gray-800 text-lg truncate">Prakiraan Cuaca</h3>
-    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Data Realtime BMKG</p>
-  </div>
-  {/* Ikon cuaca diberi kotak khusus agar ada pembatas visual */}
-  <div className="p-3 bg-white rounded-2xl shadow-sm border border-blue-50 flex-shrink-0 ml-4">
-    {getWeatherIcon(prakiraanSekarang.weather_desc)}
-  </div>
-</div>
+      {/* HEADER WIDGET */}
+      <div className="flex justify-between items-center mb-4 relative z-10">
+        <div className="min-w-0">
+          <h3 className="font-bold text-gray-800 text-lg truncate">Prakiraan Cuaca</h3>
+          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Data Realtime BMKG</p>
+        </div>
+        <div className="p-3 bg-white rounded-2xl shadow-sm border border-blue-50 flex-shrink-0 ml-4">
+          {getWeatherIcon(prakiraanSekarang.weather_desc)}
+        </div>
+      </div>
 
-      <div className="mb-4 relative z-10 flex-1">
+      {/* DETAIL LOKASI DAN SUHU SEKARANG */}
+      <div className="mb-4 relative z-10">
         <p className="text-xs font-bold text-gray-700 flex items-center gap-1">
-           <MapPin size={12} className="text-primary"/> 
-           {lokasiTerdeteksi !== 'Makassar (Default)' && lokasiTerdeteksi !== 'Akses Lokasi Ditolak' 
+           <MapPin size={12} className="text-green-600"/> 
+           {/* UBAH DISINI: Pengecekan text default diubah ke Barru */}
+           {lokasiTerdeteksi !== 'Barru (Default)' && lokasiTerdeteksi !== 'Akses Lokasi Ditolak' 
               ? `Area ${lokasiTerdeteksi}` 
               : `${lokasiResmiBMKG.kecamatan}, ${lokasiResmiBMKG.kotkab}`}
         </p>
@@ -143,7 +157,8 @@ export default function WeatherWidget() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 border-t border-blue-100/50 pt-4 mt-auto relative z-10">
+      {/* KELEMBAPAN & ANGIN */}
+      <div className="grid grid-cols-2 gap-2 mb-4 relative z-10">
         <div className="flex items-center gap-2 text-[11px] font-bold text-gray-600 bg-white/50 p-2 rounded-xl">
           <Droplets size={16} className="text-blue-400" />
           <span>Lembap: {prakiraanSekarang.hu}%</span>
@@ -153,6 +168,29 @@ export default function WeatherWidget() {
           <span>Angin: {prakiraanSekarang.ws} km/j</span>
         </div>
       </div>
+
+      {/* PANEL RAMALAN MULTI-HARI (HARI INI, BESOK, LUSA) */}
+      <div className="border-t border-blue-100/50 pt-3 mt-auto relative z-10">
+        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Prakiraan 3 Hari Ke Depan</p>
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+          {prakiraanHarian.slice(0, 3).map((hari, index) => {
+            // Mengambil jam pertama dari masing-masing array hari
+            const dataHari = hari[0] || hari; 
+            const labelHari = index === 0 ? 'Hari Ini' : index === 1 ? 'Besok' : 'Lusa';
+            
+            return (
+              <div key={index} className="flex-1 flex flex-col items-center min-w-[75px] bg-white/60 border border-white p-2 rounded-xl">
+                <span className="text-[10px] font-bold text-gray-500">{labelHari}</span>
+                <div className="my-1 scale-75">
+                  {getWeatherIcon(dataHari.weather_desc)}
+                </div>
+                <span className="text-sm font-black text-gray-800">{dataHari.t}°C</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
     </div>
   );
 }

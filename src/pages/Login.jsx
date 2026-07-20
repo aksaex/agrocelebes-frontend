@@ -28,7 +28,6 @@ export default function Login() {
           toast.dismiss(toastId);
           setShowOnboarding(true); 
         } else {
-          localStorage.setItem('token', res.data.token); 
           localStorage.setItem('user', JSON.stringify(res.data.user));
           toast.success(`Selamat datang, ${res.data.user.nama}!`, { id: toastId });
           navigate('/dashboard');
@@ -57,9 +56,6 @@ export default function Login() {
       
       localStorage.setItem('user', JSON.stringify(response.data.user)); 
       navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
-      
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      navigate(response.data.user.role === 'admin' ? '/admin' : '/dashboard');
     } catch (error) {
       toast.error('Email atau Password salah!');
     } finally {
@@ -77,7 +73,7 @@ export default function Login() {
             <ShieldCheck className="text-primary" size={36} />
           </div>
           <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mb-3 leading-tight">Selamat Datang</h2>
-          <p className="text-gray-500 text-sm mb-6">Masuk ke akun AgroCelebes Anda untuk mengelola komoditas dan memantau pasar B2B.</p>
+          <p className="text-gray-500 text-sm mb-6">Masuk ke akun AgroCelebes Anda.</p>
           <div className="hidden md:block w-16 h-1 bg-primary rounded-full mb-6"></div>
           <p className="hidden md:block text-sm text-gray-600 font-medium">
             Belum punya akun? <br/>
