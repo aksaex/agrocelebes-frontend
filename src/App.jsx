@@ -31,12 +31,13 @@ import NotFound from './pages/NotFound';
 import KalkulatorTani from './pages/KalkulatorTani';
 
 // =====================================================================
-// 1. AXIOS INTERCEPTOR
+// 1. AXIOS INTERCEPTOR (Pencegah Login Loop & Penangan Token Expired)
 // =====================================================================
 axios.interceptors.response.use(
   (response) => response, 
   (error) => {
     const requestUrl = error.config?.url || '';
+    // Jangan lakukan redirect jika error 401 berasal dari pengecekan sesi awal
     const isAuthBootstrapCall = requestUrl.includes('/auth/me');
 
     if (error.response && error.response.status === 401 && !isAuthBootstrapCall && window.location.pathname !== '/login') {
@@ -49,13 +50,15 @@ axios.interceptors.response.use(
 );
 
 // =====================================================================
-// 2. SATPAM PINTU UTAMA
+// 2. SATPAM PINTU UTAMA (Role-Based Access Control)
 // =====================================================================
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const user = JSON.parse(localStorage.getItem('user'));
 
+  // Jika belum login, tendang ke halaman login
   if (!user) return <Navigate to="/login" replace />;
 
+  // Jika punya role tapi tidak sesuai izin rute, tendang ke dashboard bawaannya
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     toast.error('Akses Ditolak! Anda tidak memiliki izin ke halaman ini.');
     return <Navigate to="/dashboard" replace />; 
@@ -65,7 +68,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 };
 
 // =====================================================================
-// 3. POLISI LALU LINTAS DASHBOARD
+// 3. POLISI LALU LINTAS DASHBOARD (Dinamic Redirect)
 // =====================================================================
 const DashboardRouter = () => {
   const user = JSON.parse(localStorage.getItem('user'));
@@ -88,6 +91,7 @@ function App() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
+    // Mengecek apakah ada cookie/sesi aktif di server saat web baru dibuka
     const bootstrapSession = async () => {
       const bootstrapClient = axios.create({ withCredentials: true });
 
@@ -113,6 +117,7 @@ function App() {
     bootstrapSession();
   }, []);
 
+  // Jangan render apapun sebelum pengecekan sesi selesai (mencegah kedipan UI)
   if (!sessionReady) return null;
 
   return (
@@ -127,9 +132,10 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           
+          {/* Otomatis ter-redirect sesuai Role */}
           <Route path="/dashboard" element={<DashboardRouter />} />
 
-          {/* === JALUR PRIVAT DASHBOARD === */}
+          {/* === JALUR PRIVAT DASHBOARD (SPESIFIK ROLE) === */}
           <Route path="/petani/dashboard" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><PetaniDashboard /></MainLayout></ProtectedRoute>} />
           <Route path="/kud/dashboard" element={<ProtectedRoute allowedRoles={['kud']}><MainLayout><KudDashboard /></MainLayout></ProtectedRoute>} />
           <Route path="/pabrik/dashboard" element={<ProtectedRoute allowedRoles={['pabrik']}><MainLayout><PabrikDashboard /></MainLayout></ProtectedRoute>} />
@@ -141,13 +147,15 @@ function App() {
           {/* === JALUR KHUSUS ADMIN === */}
           <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['admin']}><MainLayout><UserMenej /></MainLayout></ProtectedRoute>} />
 
-          {/* === JALUR PRIVAT GLOBAL === */}
+          {/* === JALUR PRIVAT GLOBAL (FITUR PETANI DLL) === */}
           <Route path="/ai-penyuluh" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><AiPenyuluh /></MainLayout></ProtectedRoute>} />
           <Route path="/kalkulator" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><KalkulatorTani /></MainLayout></ProtectedRoute>} />
           <Route path="/jurnal" element={<ProtectedRoute allowedRoles={['petani']}><MainLayout><JurnalTani /></MainLayout></ProtectedRoute>} />
           
+          {/* Akses Profil untuk semua Role yang login */}
           <Route path="/profile" element={<ProtectedRoute><MainLayout><Profile /></MainLayout></ProtectedRoute>} />
           
+          {/* Jalur 404 jika URL tidak ditemukan */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
