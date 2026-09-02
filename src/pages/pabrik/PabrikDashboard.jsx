@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
-import RoleContractDashboard from '../../components/RoleContractDashboard';
-import { Factory, Banknote, Truck, Activity, PackageCheck, ShieldCheck, ArrowDownToLine, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
+import { 
+  Factory, Banknote, Truck, Activity, PackageCheck, 
+  ShieldCheck, ArrowDownToLine, Clock, CheckCircle2 
+} from 'lucide-react';
 
 // Mock Data Logistik Masuk (Inbound)
 const inboundLogistics = [
@@ -10,6 +14,43 @@ const inboundLogistics = [
 
 export default function PabrikDashboard() {
   const [activeTab, setActiveTab] = useState('kontrak');
+  
+  // State untuk Data API Escrow
+  const [kontrakList, setKontrakList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fungsi Mengambil Data Kontrak
+  const fetchKontrak = async () => {
+    setIsLoading(true);
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/escrow`, {
+        withCredentials: true
+      });
+      setKontrakList(res.data);
+    } catch (error) {
+      toast.error('Gagal mengambil data kontrak escrow.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchKontrak();
+  }, []);
+
+  // Fungsi Eksekusi Setor DP
+  const handlePayDp = async (id) => {
+    const tid = toast.loading('Memproses pembayaran Virtual Account...');
+    try {
+      await axios.put(`${import.meta.env.VITE_API_URL}/escrow/${id}/pay-dp`, {}, { 
+        withCredentials: true 
+      });
+      toast.success('DP berhasil dikunci di Escrow!', { id: tid });
+      fetchKontrak(); // Refresh data setelah sukses
+    } catch (err) { 
+      toast.error(err.response?.data?.pesan || 'Gagal memproses DP', { id: tid }); 
+    }
+  };
 
   return (
     <div className="flex flex-col font-sans animate-fade-in pb-10 min-h-screen w-full bg-slate-50/50">
@@ -58,7 +99,7 @@ export default function PabrikDashboard() {
       {/* KONTEN UTAMA */}
       <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto flex-1">
         
-        {/* TAB 1: KONTROK & DP (Memanggil Komponen yang sudah ada) */}
+        {/* TAB 1: KONTROK & DP (Terintegrasi API) */}
         {activeTab === 'kontrak' && (
           <div className="animate-fade-in">
             <div className="mb-6 bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3">
@@ -72,7 +113,61 @@ export default function PabrikDashboard() {
                  </p>
                </div>
             </div>
-            <RoleContractDashboard role="pabrik" />
+
+            {/* List Kontrak dari API */}
+            <div className="grid gap-4">
+              {isLoading ? (
+                <div className="py-12 text-center text-indigo-500 font-bold animate-pulse">
+                  Memuat data kontrak dari server...
+                </div>
+              ) : kontrakList.length === 0 ? (
+                <div className="py-12 text-center text-gray-400 font-bold bg-white rounded-3xl border border-dashed border-gray-300">
+                  Belum ada penawaran agregasi dari KUD saat ini.
+                </div>
+              ) : (
+                kontrakList.map((item) => (
+                  <div key={item._id} className="bg-white rounded-3xl border border-gray-200 shadow-sm p-5 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-5 hover:border-indigo-300 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md border ${
+                          item.status === 'verifikasi_lahan' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                          item.status === 'pending' ? 'bg-slate-50 text-slate-500 border-slate-200' :
+                          'bg-emerald-50 text-emerald-600 border-emerald-100'
+                        }`}>
+                          {item.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <h3 className="text-xl font-black text-gray-900">{item.komoditas} - {item.tonase} Ton</h3>
+                      <p className="text-sm font-bold text-gray-500 mt-2">
+                        Petani: <span className="text-indigo-600">{item.petani_id?.nama || 'Anonim'}</span>
+                      </p>
+                      <p className="text-sm font-bold text-gray-500 mt-1">
+                        Nilai Kontrak: <span className="text-emerald-600">Rp {item.nilai_kontrak?.toLocaleString('id-ID')}</span>
+                      </p>
+                    </div>
+
+                    <div className="w-full md:w-auto shrink-0 border-t md:border-t-0 border-gray-100 pt-4 md:pt-0 mt-2 md:mt-0">
+                      {item.status === 'verifikasi_lahan' ? (
+                        <button 
+                          onClick={() => handlePayDp(item._id)}
+                          className="w-full md:w-auto bg-amber-500 hover:bg-amber-600 text-white px-6 py-3.5 rounded-xl font-bold text-sm transition shadow-sm flex items-center justify-center gap-2"
+                        >
+                          <Banknote size={18} /> Setor DP Escrow (VA)
+                        </button>
+                      ) : item.status === 'pending' ? (
+                        <div className="w-full md:w-auto flex items-center justify-center gap-2 text-slate-500 text-sm font-bold bg-slate-50 px-6 py-3.5 rounded-xl border border-slate-200">
+                          <Clock size={18}/> Menunggu KUD
+                        </div>
+                      ) : (
+                        <div className="w-full md:w-auto flex items-center justify-center gap-2 text-emerald-600 font-bold text-sm bg-emerald-50 px-6 py-3.5 rounded-xl border border-emerald-200">
+                          <CheckCircle2 size={18} /> DP Terkunci
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
 

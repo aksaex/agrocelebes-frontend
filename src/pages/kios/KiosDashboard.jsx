@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import KiosInvoiceGuaranteePanel from '../../components/KiosInvoiceGuaranteePanel';
-import RoleContractDashboard from '../../components/RoleContractDashboard';
-import { Store, Package, FileText, ShieldCheck, Sprout, AlertCircle, TrendingUp } from 'lucide-react';
+import toast from 'react-hot-toast';
+// Pastikan komponen ini tersedia di folder Anda untuk tab 'distribusi'
+import RoleContractDashboard from '../../components/RoleContractDashboard'; 
+import { Store, Package, FileText, ShieldCheck, Sprout, AlertCircle, TrendingUp, Building2, CheckCircle2, ArrowRightLeft, CreditCard } from 'lucide-react';
 
 // Mock Data Stok Gudang Kios
 const mockStok = [
@@ -11,8 +12,55 @@ const mockStok = [
   { id: 4, nama: 'Pestisida Cair Nabati', stok: 120, satuan: 'Liter', status: 'Menipis', warna: 'text-amber-600', bg: 'bg-amber-50' }
 ];
 
+// Mock Data Invoice Guarantee (Uang dari Pabrik yang tertahan di Escrow)
+const initialInvoices = [
+  { 
+    id: 'INV-ESC-001', 
+    petani: 'Kelompok Tani Harapan (Pak Rustan)', 
+    pabrik: 'PT Agro Pangan Sulsel', 
+    nominal: 15500000, 
+    status: 'Tersedia', // Artinya pupuk sudah diserahkan, dana siap dicairkan kios
+    tanggal: '18 Agt 2026'
+  },
+  { 
+    id: 'INV-ESC-002', 
+    petani: 'KUD Sumber Makmur', 
+    pabrik: 'PT Beras Nusantara', 
+    nominal: 8200000, 
+    status: 'Terkunci', // Artinya DP sudah masuk Escrow, tapi kios belum kasih pupuk
+    tanggal: '19 Agt 2026'
+  },
+  { 
+    id: 'INV-ESC-003', 
+    petani: 'Kelompok Tani Sejahtera', 
+    pabrik: 'PT Agro Pangan Sulsel', 
+    nominal: 21000000, 
+    status: 'Dicairkan', 
+    tanggal: '15 Agt 2026'
+  }
+];
+
 export default function KiosDashboard() {
   const [activeTab, setActiveTab] = useState('distribusi');
+  const [invoices, setInvoices] = useState(initialInvoices);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fungsi Simulasi Pencairan BI-FAST
+  const handleCairkanDana = (id) => {
+    setIsProcessing(true);
+    const toastId = toast.loading('Mengontak API BPD Sulselbar (BI-FAST)...');
+    
+    setTimeout(() => {
+      setInvoices(prev => prev.map(inv => 
+        inv.id === id ? { ...inv, status: 'Dicairkan' } : inv
+      ));
+      toast.success('Dana berhasil masuk ke rekening Kios Anda!', { id: toastId });
+      setIsProcessing(false);
+    }, 2000);
+  };
+
+  const totalCair = invoices.filter(i => i.status === 'Dicairkan').reduce((acc, curr) => acc + curr.nominal, 0);
+  const totalTersedia = invoices.filter(i => i.status === 'Tersedia').reduce((acc, curr) => acc + curr.nominal, 0);
 
   return (
     <div className="flex flex-col font-sans animate-fade-in pb-10 min-h-screen w-full bg-orange-50/30">
@@ -71,7 +119,7 @@ export default function KiosDashboard() {
       {/* KONTEN UTAMA */}
       <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto flex-1">
         
-        {/* TAB 1: DISTRIBUSI PUPUK (Memanggil Komponen Asli) */}
+        {/* TAB 1: DISTRIBUSI PUPUK */}
         {activeTab === 'distribusi' && (
           <div className="animate-fade-in">
             <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 shadow-sm">
@@ -81,7 +129,7 @@ export default function KiosDashboard() {
                <div>
                  <h4 className="text-sm font-bold text-amber-900">Aksi Dibutuhkan: Penyaluran Pupuk</h4>
                  <p className="text-xs text-amber-700 mt-1">
-                   Daftar di bawah ini adalah kontrak yang DP-nya sudah dibayar oleh Pabrik. Segera distribusikan pupuk ke petani agar siklus tanam dapat dimulai.
+                   Daftar di bawah ini adalah kontrak yang DP-nya sudah dibayar oleh Pabrik. Segera distribusikan pupuk ke petani agar jaminan invoice dana Anda aktif.
                  </p>
                </div>
             </div>
@@ -89,14 +137,69 @@ export default function KiosDashboard() {
           </div>
         )}
 
-        {/* TAB 2: INVOICE GUARANTEE (Memanggil Komponen Asli) */}
+        {/* TAB 2: INVOICE GUARANTEE (Solusi Kritis Closed-Loop Saprotan) */}
         {activeTab === 'invoice' && (
-          <div className="animate-fade-in flex flex-col gap-4">
-             <div className="mb-2">
-               <h2 className="text-lg font-black text-gray-800">Cairkan Jaminan Dana</h2>
-               <p className="text-sm text-gray-500">Pantau dan cairkan pembayaran (invoice) dari *escrow smart contract* atas pupuk yang telah Anda salurkan.</p>
+          <div className="animate-fade-in flex flex-col gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-6 rounded-3xl text-white shadow-lg relative overflow-hidden">
+                   <CreditCard className="absolute -right-4 -bottom-4 opacity-20" size={100} />
+                   <p className="text-xs font-bold uppercase tracking-widest text-emerald-200 mb-1">Saldo Dapat Dicairkan</p>
+                   <h2 className="text-3xl font-black mb-4">Rp {totalTersedia.toLocaleString('id-ID')}</h2>
+                   <p className="text-xs text-emerald-100/80">Dana ini berasal dari DP Pabrik di Escrow BPD yang pupuknya sudah Anda serahkan ke petani.</p>
+                </div>
+                <div className="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm flex flex-col justify-center">
+                   <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Total Sukses Dicairkan (Bulan Ini)</p>
+                   <h2 className="text-3xl font-black text-gray-800">Rp {totalCair.toLocaleString('id-ID')}</h2>
+                </div>
              </div>
-             <KiosInvoiceGuaranteePanel />
+
+             <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                   <h3 className="font-bold text-gray-800">Daftar Tagihan Escrow (Smart Contract)</h3>
+                </div>
+                <div className="divide-y divide-gray-100">
+                   {invoices.map((inv) => (
+                      <div key={inv.id} className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-gray-50 transition">
+                         <div className="flex items-start gap-4">
+                            <div className={`p-3 rounded-2xl shrink-0 ${inv.status === 'Tersedia' ? 'bg-emerald-100 text-emerald-600' : inv.status === 'Terkunci' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                               <FileText size={24} />
+                            </div>
+                            <div>
+                               <p className="font-black text-gray-800 text-lg">Rp {inv.nominal.toLocaleString('id-ID')}</p>
+                               <p className="text-sm font-bold text-gray-600 mt-1">{inv.id}</p>
+                               <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                                  <Building2 size={12}/> {inv.pabrik} <ArrowRightLeft size={12} className="mx-1"/> <Sprout size={12}/> {inv.petani}
+                               </div>
+                            </div>
+                         </div>
+                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between gap-2 border-t md:border-t-0 border-gray-100 pt-3 md:pt-0">
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${
+                               inv.status === 'Tersedia' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 
+                               inv.status === 'Terkunci' ? 'bg-amber-50 text-amber-600 border-amber-200' : 
+                               'bg-blue-50 text-blue-600 border-blue-200'
+                            }`}>
+                               Status: {inv.status}
+                            </span>
+                            {inv.status === 'Tersedia' && (
+                               <button 
+                                 onClick={() => handleCairkanDana(inv.id)}
+                                 disabled={isProcessing}
+                                 className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-md disabled:bg-gray-400"
+                               >
+                                 Cairkan ke Rekening
+                               </button>
+                            )}
+                            {inv.status === 'Terkunci' && (
+                               <p className="text-[10px] text-amber-600 font-medium">Serahkan pupuk untuk mencairkan</p>
+                            )}
+                            {inv.status === 'Dicairkan' && (
+                               <p className="text-[10px] text-blue-600 font-bold flex items-center gap-1"><CheckCircle2 size={12}/> Selesai</p>
+                            )}
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
           </div>
         )}
 
