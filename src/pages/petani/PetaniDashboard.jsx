@@ -244,6 +244,20 @@ export default function PetaniDashboard() {
                 {profile?.profil_lahan?.status_lahan || 'Belum Terpetakan'}
               </p>
               <p className="text-xs text-gray-500 mt-2">Luas Lahan Terdaftar: <strong>{profile?.profil_lahan?.luas_lahan_ha || 0} Ha</strong></p>
+              
+              {/* 🌟 KOMPONEN BARU: INDIKATOR AGROSCORE DARI SATELIT */}
+              {profile?.profil_lahan?.agro_score_final && (
+                <div className="mt-3 bg-gradient-to-r from-emerald-50 to-green-50 p-3 rounded-xl border border-emerald-100 flex justify-between items-center animate-fade-in">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Skor Kredit AgroScore</span>
+                    <p className="text-xs font-bold text-gray-700 mt-0.5">{profile.profil_lahan.agro_kategori}</p>
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-emerald-200 shadow-sm flex items-center gap-2">
+                    <span className="text-xl font-black text-emerald-700">{profile.profil_lahan.agro_score_final}</span>
+                    <span className="text-[10px] text-gray-400 font-bold mt-1">/ 100</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200/60">
@@ -354,19 +368,38 @@ export default function PetaniDashboard() {
           <Volume2 size={20} /> Dengarkan Status Saya
         </button>
 
-        {/* TOMBOL PENGAJUAN YANG SUDAH DIBUKA GEMBOKNYA */}
-        <button 
-          onClick={handleAjukanPinjaman} 
-          disabled={!latitude || !longitude} 
-          className={`w-full py-4 rounded-xl text-sm font-black tracking-wide flex items-center justify-center gap-2 transition shadow-md ${
-            (!latitude || !longitude)
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
-              : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-95'
-          }`}
-        >
-          <Coins size={18} />
-          AJUKAN PINJAMAN AWAL MODAL TANAM
-        </button>
+        {/* 🌟 TOMBOL PENGAJUAN DINAMIS (MENCEGAH PENGAJUAN GANDA & MUSIM TANAM BARU) */}
+        {isKontrakAktif ? (
+          <button 
+            disabled
+            className="w-full py-4 rounded-xl text-sm font-black tracking-wide flex items-center justify-center gap-2 bg-gray-200 text-gray-500 cursor-not-allowed shadow-inner"
+          >
+            <ShieldAlert size={18} />
+            KONTRAK SEDANG BERJALAN (TIDAK BISA PENGAJUAN BARU)
+          </button>
+        ) : isMusimBaru ? (
+          <button 
+            onClick={handleAjukanPinjaman} 
+            disabled={!latitude || !longitude} 
+            className="w-full py-4 rounded-xl text-sm font-black tracking-wide flex items-center justify-center gap-2 transition shadow-md bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-95"
+          >
+            <RefreshCw size={18} />
+            MULAI MUSIM TANAM BARU (AJUKAN PINJAMAN)
+          </button>
+        ) : (
+          <button 
+            onClick={handleAjukanPinjaman} 
+            disabled={!latitude || !longitude} 
+            className={`w-full py-4 rounded-xl text-sm font-black tracking-wide flex items-center justify-center gap-2 transition shadow-md ${
+              (!latitude || !longitude)
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+                : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-95'
+            }`}
+          >
+            <Coins size={18} />
+            AJUKAN PINJAMAN AWAL MODAL TANAM
+          </button>
+        )}
 
         <p className="text-[10px] text-gray-500 mt-2 text-center">
           *Tombol terbuka setelah Anda mengunci GPS. KUD akan memverifikasi kelayakan via Satelit.
