@@ -25,7 +25,7 @@ export default function WeatherWidget() {
             return { kode, namaKota: kota };
         }
     }
-    // UBAH DISINI: Default dikembalikan ke Barru
+    // Default dikembalikan ke Barru
     return { kode: "73.11.04.1001", namaKota: "Barru (Default)" };
   };
 
@@ -50,7 +50,7 @@ export default function WeatherWidget() {
               const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=${kode}`);
               setWeatherData(response.data);
             } catch (apiErr) {
-              // UBAH DISINI: Fallback dialihkan ke Barru jika wilayah lain error
+              // Fallback dialihkan ke Barru jika wilayah lain error
               console.warn(`Kode wilayah ${kode} (${namaKota}) direspons error oleh BMKG. Mengalihkan ke data resmi terdekat.`);
               
               const fallbackResponse = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=73.11.04.1001`);
@@ -78,7 +78,7 @@ export default function WeatherWidget() {
 
   const muatCuacaDefault = async () => {
     try {
-      // UBAH DISINI: Mengambil default cuaca Barru jika akses GPS ditolak
+      // Mengambil default cuaca Barru jika akses GPS ditolak
       const response = await axios.get(`${import.meta.env.VITE_API_URL}/weather?adm4=73.11.04.1001`);
       setWeatherData(response.data);
     } catch (err) {
@@ -144,7 +144,6 @@ export default function WeatherWidget() {
       <div className="mb-4 relative z-10">
         <p className="text-xs font-bold text-gray-700 flex items-center gap-1">
            <MapPin size={12} className="text-green-600"/> 
-           {/* UBAH DISINI: Pengecekan text default diubah ke Barru */}
            {lokasiTerdeteksi !== 'Barru (Default)' && lokasiTerdeteksi !== 'Akses Lokasi Ditolak' 
               ? `Area ${lokasiTerdeteksi}` 
               : `${lokasiResmiBMKG.kecamatan}, ${lokasiResmiBMKG.kotkab}`}

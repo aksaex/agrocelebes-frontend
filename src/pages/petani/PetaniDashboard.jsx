@@ -2,26 +2,31 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { 
   MapPin, WifiOff, CheckCircle, ShieldAlert, Coins, Layers, 
-  RefreshCw, CloudSnow, RefreshCcw, CheckCircle2 
+  RefreshCw, CloudSnow, RefreshCcw, CheckCircle2, Volume2 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import WeatherWidget from '../../components/WeatherWidget';
+import { speakNotification } from '../../utils/voiceAssistant';
 
 export default function PetaniDashboard() {
   // --- STATE UTAMA ---
   const [profile, setProfile] = useState(null);
   const [escrowContract, setEscrowContract] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // --- STATE INPUT GEOTAGGING ---
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
-  
+
   // --- STATE OFFLINE-FIRST (PWA) ---
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [pendingGeotag, setPendingGeotag] = useState(null);
   const isSyncingRef = useRef(false);
+
+  // 🌟 LOGIKA BISNIS: Cek apakah ada kontrak aktif (belum selesai)
+  const isKontrakAktif = escrowContract && escrowContract.status !== 'selesai';
+  const isMusimBaru = escrowContract && escrowContract.status === 'selesai';
 
   // 🌟 KUNCI KEAMANAN
   const getAuthConfig = () => {
@@ -38,7 +43,7 @@ export default function PetaniDashboard() {
     try {
       const profileRes = await axios.get(`${import.meta.env.VITE_API_URL}/user/profile`, getAuthConfig());
       setProfile(profileRes.data);
-      
+
       if (profileRes.data?.koordinat_lokasi?.lat && profileRes.data?.koordinat_lokasi?.lng) {
         setLatitude(profileRes.data.koordinat_lokasi.lat);
         setLongitude(profileRes.data.koordinat_lokasi.lng);
@@ -95,12 +100,13 @@ export default function PetaniDashboard() {
 
     try {
       await axios.post(`${import.meta.env.VITE_API_URL}/user/geotag`, dataKoordinat, getAuthConfig());
-      
+
       // Bersihkan antrean offline
       localStorage.removeItem('agro_pending_geotag');
       setPendingGeotag(null);
-      
+
       toast.success('Berhasil! Lahan Anda masuk antrean verifikasi satelit KUD.', { id: tid });
+      speakNotification('Data lahan berhasil disinkronkan ke pusat. Lahan Anda masuk antrean verifikasi satelit.');
       fetchDashboardData(); 
     } catch (error) {
       toast.error('Gagal menyinkronkan data.', { id: tid });
@@ -114,19 +120,22 @@ export default function PetaniDashboard() {
   const dapatkanLokasiGPS = () => {
     if (!navigator.geolocation) {
       toast.error('Perangkat Anda tidak mendukung sensor GPS');
+      speakNotification('Perangkat HP Anda tidak mendukung fitur sensor GPS.');
       return;
     }
 
     const tid = toast.loading('Mencari satelit GPS di area sawah...', { id: 'gps' });
+    speakNotification('Mencari satelit GPS, mohon tunggu sebentar.');
+
     navigator.geolocation.getCurrentPosition(
       (position) => {
         toast.dismiss(tid);
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        
+
         setLatitude(lat);
         setLongitude(lng);
-        
+
         const dataBaru = { lat: parseFloat(lat), lng: parseFloat(lng) };
 
         if (isOnline) {
@@ -136,10 +145,12 @@ export default function PetaniDashboard() {
           localStorage.setItem('agro_pending_geotag', JSON.stringify(dataBaru));
           setPendingGeotag(dataBaru);
           toast.success('Tersimpan di HP (Mode Offline). Menunggu sinyal...', { id: 'gps' });
+          speakNotification('Tidak ada sinyal internet. Koordinat lahan disimpan sementara di HP. Sistem akan otomatis mengirim saat sinyal kembali.');
         }
       },
       () => {
         toast.error('Gagal mengunci satelit. Aktifkan Izin Lokasi HP Anda.', { id: 'gps' });
+        speakNotification('Gagal mengunci posisi. Pastikan izin lokasi HP Anda sudah aktif.');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
@@ -153,13 +164,14 @@ export default function PetaniDashboard() {
     }
 
     const dataBaru = { lat: parseFloat(latitude), lng: parseFloat(longitude) };
-    
+
     if (isOnline) {
       syncGeotagKeCloud(dataBaru);
     } else {
       localStorage.setItem('agro_pending_geotag', JSON.stringify(dataBaru));
       setPendingGeotag(dataBaru);
       toast.success('Offline! Pemetaan lahan disimpan lokal di memori HP.');
+      speakNotification('Disimpan lokal. Menunggu jaringan internet kembali normal.');
     }
   };
 
@@ -169,11 +181,13 @@ export default function PetaniDashboard() {
       toast.loading('Memproses pengajuan ke KUD & Pabrik...', { id: 'loan' });
       await axios.post(`${import.meta.env.VITE_API_URL}/escrow/ajukan-pinjaman`, {}, getAuthConfig());
       toast.success('Pinjaman Awal Berhasil Diajukan! Menunggu Escrow didanai Pabrik.', { id: 'loan' });
+      speakNotification('Pengajuan modal tanam Anda berhasil dikirim ke Koperasi. Menunggu verifikasi satelit dan pendanaan dari Pabrik.');
       fetchDashboardData();
     } catch (err) {
       console.error(err);
       const pesanError = err.response?.data?.pesan || "Gagal mengajukan pinjaman.";
       toast.error(pesanError);
+      speakNotification('Maaf, pengajuan pinjaman Anda gagal diproses sistem.');
     }
   };
 
@@ -188,7 +202,7 @@ export default function PetaniDashboard() {
 
   return (
     <div className="p-4 max-w-4xl mx-auto flex flex-col gap-6 font-sans pb-12 animate-fade-in">
-      
+
       {/* HEADER & INDIKATOR JARINGAN */}
       <div className="flex justify-between items-end border-b border-gray-200 pb-4">
         <div>
@@ -231,7 +245,7 @@ export default function PetaniDashboard() {
               </p>
               <p className="text-xs text-gray-500 mt-2">Luas Lahan Terdaftar: <strong>{profile?.profil_lahan?.luas_lahan_ha || 0} Ha</strong></p>
             </div>
-            
+
             <div className="mt-4 pt-4 border-t border-gray-200/60">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Koordinat Saat Ini</span>
               <div className="grid grid-cols-2 gap-2 mt-1">
@@ -249,7 +263,7 @@ export default function PetaniDashboard() {
               <p className="mt-2 text-[11px] leading-relaxed">Luas Centroid Analisis: {profile?.profil_lahan?.luas_lahan_ha || 0} HA</p>
               <p className="text-[11px] leading-relaxed">Skor Risiko Cuaca BMKG: {profile?.profil_lahan?.cuaca_score ?? '1.0'}</p>
             </div>
-            
+
             <div className={`mt-4 p-2.5 rounded-xl border text-[10px] ${pendingGeotag ? 'bg-amber-900/40 border-amber-800 text-amber-400 animate-pulse' : 'bg-black/40 border-gray-800'}`}>
               {pendingGeotag 
                 ? '⚠️ TERSIMPAN LOKAL (OFFLINE). MENUNGGU SINYAL...' 
@@ -259,10 +273,20 @@ export default function PetaniDashboard() {
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button onClick={dapatkanLokasiGPS} disabled={isSyncing} className="flex-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2">
-            <MapPin size={16} className="text-green-600" /> 1-Klik Kunci GPS (Offline Support)
+          <button 
+            onClick={dapatkanLokasiGPS} 
+            disabled={isSyncing || isKontrakAktif} 
+            className="flex-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-800 py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2"
+          >
+            <MapPin size={16} className={isKontrakAktif ? "text-gray-400" : "text-green-600"} /> 
+            {isKontrakAktif ? 'Terkunci (Kontrak Aktif)' : '1-Klik Kunci GPS (Offline)'}
           </button>
-          <button onClick={simpanPemetaanLahan} disabled={isSyncing} className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm">
+
+          <button 
+            onClick={simpanPemetaanLahan} 
+            disabled={isSyncing || isKontrakAktif} 
+            className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
+          >
             <CheckCircle size={16} /> Simpan & Sinkronisasi
           </button>
         </div>
@@ -311,6 +335,25 @@ export default function PetaniDashboard() {
           </div>
         )}
 
+        {/* 🎙️ FITUR BARU: TOMBOL VOICE-FIRST */}
+        <button 
+          onClick={() => {
+            let teksSuara = "";
+            if (escrowContract?.status) {
+              const formatStatus = escrowContract.status.replace('_', ' ');
+              teksSuara = `Status kontrak Anda saat ini adalah ${formatStatus}. ${escrowContract.catatan || ''}`;
+            } else if (profile?.profil_lahan?.status_lahan === 'terverifikasi') {
+              teksSuara = "Selamat. Lahan Anda telah diverifikasi oleh satelit. Silakan tekan tombol hijau di bawah untuk mengajukan pinjaman awal modal tanam.";
+            } else {
+              teksSuara = "Lahan Anda belum diverifikasi. Silakan kunci posisi koordinat lahan terlebih dahulu pada panel di atas.";
+            }
+            speakNotification(teksSuara);
+          }}
+          className="mb-4 w-full bg-blue-50 text-blue-700 hover:bg-blue-100 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border border-blue-200 transition"
+        >
+          <Volume2 size={20} /> Dengarkan Status Saya
+        </button>
+
         {/* TOMBOL PENGAJUAN YANG SUDAH DIBUKA GEMBOKNYA */}
         <button 
           onClick={handleAjukanPinjaman} 
@@ -324,7 +367,7 @@ export default function PetaniDashboard() {
           <Coins size={18} />
           AJUKAN PINJAMAN AWAL MODAL TANAM
         </button>
-        
+
         <p className="text-[10px] text-gray-500 mt-2 text-center">
           *Tombol terbuka setelah Anda mengunci GPS. KUD akan memverifikasi kelayakan via Satelit.
         </p>

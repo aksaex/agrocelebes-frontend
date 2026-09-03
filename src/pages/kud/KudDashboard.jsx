@@ -6,9 +6,11 @@ import {
   CheckCircle2, Clock, Satellite, Leaf 
 } from 'lucide-react';
 
+// 🌟 1. IMPORT KOMPONEN PETA DI SINI
+import KudMapPanel from '../../components/KudMapPanel';
+
 export default function KudDashboard() {
   const [activeTab, setActiveTab] = useState('kontrak');
-
   const [kontrakList, setKontrakList] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -29,11 +31,17 @@ export default function KudDashboard() {
     fetchKontrak();
   }, []);
 
-  // Kita butuh ID kontrak Escrow DAN ID Petani untuk ditarik satelitnya
-  const handleVerifikasi = async (escrowId, petaniId) => {
+  // 🛡️ PERBAIKAN: Ekstraksi ID Petani secara aman dari objek populasi
+  const handleVerifikasi = async (escrowId, petaniData) => {
+    const petaniId = typeof petaniData === 'object' ? petaniData?._id : petaniData;
+
+    if (!petaniId || petaniId === 'undefined') {
+      toast.error('Gagal: ID Petani tidak valid atau belum terhubung.');
+      return;
+    }
+
     const toastId = toast.loading('Menghubungkan ke Satelit ESA Sentinel...', { duration: 5000 });
     try {
-      // 1. TEMBAK API SATELIT EROPA (Ambil NDVI Riil)
       const satRes = await axios.post(`${import.meta.env.VITE_API_URL}/satellite/analisis/${petaniId}`, {}, {
         withCredentials: true
       });
@@ -42,12 +50,10 @@ export default function KudDashboard() {
       
       toast.success(`Scan ${jenisSatelit} Sukses! NDVI: ${ndviRiil}`, { id: toastId, duration: 4000 });
 
-      // 2. SETUJUI KONTRAK DI ESCROW
       await axios.put(`${import.meta.env.VITE_API_URL}/escrow/${escrowId}/verify-land`, {}, {
         withCredentials: true
       });
       
-      // 3. Refresh Data di Dasbor KUD
       fetchKontrak(); 
     } catch (error) {
       toast.error(error.response?.data?.pesan || 'Satelit gagal memindai lahan.', { id: toastId });
@@ -101,9 +107,7 @@ export default function KudDashboard() {
       {/* KONTEN UTAMA */}
       <div className="p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto flex-1">
 
-        {/* ========================================================= */}
-        {/* TAB 1: PEMANTAUAN (ILUSI AI SATELIT UNTUK JURI) */}
-        {/* ========================================================= */}
+        {/* TAB 1: PEMANTAUAN AI SATELIT */}
         {activeTab === 'pemantauan' && (
           <div className="animate-fade-in">
             <div className="mb-6">
@@ -111,7 +115,6 @@ export default function KudDashboard() {
               <p className="text-sm text-gray-500">Agregasi kesehatan lahan petani menggunakan sensor optik NDVI.</p>
             </div>
 
-            {/* Mockup Dashboard AI */}
             <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
                 <Satellite size={48} className="text-blue-500 mb-4 opacity-50" />
@@ -129,9 +132,7 @@ export default function KudDashboard() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 2: KONTRAK ESCROW (HAPPY PATH B2B) */}
-        {/* ========================================================= */}
+        {/* TAB 2: KONTRAK ESCROW */}
         {activeTab === 'kontrak' && (
           <div className="animate-fade-in">
             <div className="mb-6 flex justify-between items-end">
@@ -144,7 +145,7 @@ export default function KudDashboard() {
               </span>
             </div>
 
-            <div className="grid gap-4">
+            <div className="grid gap-6">
               {isLoading ? (
                 <p className="text-center text-emerald-600 py-10 font-bold animate-pulse">Menarik data blockchain/escrow...</p>
               ) : kontrakList.length === 0 ? (
@@ -154,68 +155,88 @@ export default function KudDashboard() {
                 </div>
               ) : (
                 kontrakList.map((item) => (
-                  <div key={item._id} className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:shadow-md transition">
+                  <div key={item._id} className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4 hover:shadow-md transition">
                     
-                    <div className="w-full md:w-auto flex-1">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 inline-block border ${
-                        item.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
-                        item.status === 'selesai' ? 'bg-gray-50 text-gray-600 border-gray-200' :
-                        'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}>
-                        Status: {item.status.replace('_', ' ')}
-                      </span>
-                      <h3 className="font-black text-lg md:text-xl text-gray-800 mb-1">{item.komoditas} - {item.tonase} Ton</h3>
-                      <p className="text-sm text-gray-500 mb-2">Petani Pendaftar: <span className="font-semibold text-gray-700">{item.petani_id?.nama || 'Anonim'}</span></p>
-
-                      {/* MOCKUP AGROSCORE DINAMIS & RAMAH PETANI GUREM */}
-                      <div className="mb-3 flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100 w-full max-w-sm">
-                        <div className={`relative w-12 h-12 flex items-center justify-center rounded-full border-2 flex-shrink-0 ${
-                          (item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) > 0.5 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-blue-100 border-blue-500 text-blue-700'
+                    {/* BAGIAN ATAS: INFORMASI & TOMBOL */}
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 w-full">
+                      
+                      <div className="w-full md:w-auto flex-1">
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md mb-3 inline-block border ${
+                          item.status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 
+                          item.status === 'selesai' ? 'bg-gray-50 text-gray-600 border-gray-200' :
+                          'bg-emerald-50 text-emerald-700 border-emerald-200'
                         }`}>
-                          <span className="font-black text-sm">
-                            {Math.round(Math.max(35, (item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) * 60 + 30))}
-                          </span>
+                          Status: {item.status.replace('_', ' ')}
+                        </span>
+                        <h3 className="font-black text-lg md:text-xl text-gray-800 mb-1">{item.komoditas} - {item.tonase} Ton</h3>
+                        <p className="text-sm text-gray-500 mb-2">Petani Pendaftar: <span className="font-semibold text-gray-700">{item.petani_id?.nama || 'Anonim'}</span></p>
+
+                        <div className="mb-3 flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100 w-full max-w-sm">
+                          <div className={`relative w-12 h-12 flex items-center justify-center rounded-full border-2 flex-shrink-0 ${
+                            (item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) > 0.5 ? 'bg-green-100 border-green-500 text-green-700' : 'bg-blue-100 border-blue-500 text-blue-700'
+                          }`}>
+                            <span className="font-black text-sm">
+                              {Math.round(Math.max(35, (item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) * 60 + 30))}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Space-Verified Credit</p>
+                            <p className="text-xs font-semibold text-gray-700">
+                              {(item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) > 0.5 ? 'Layak Pendanaan Mandiri' : 'Layak (Penjaminan Kolektif KUD)'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Space-Verified Credit</p>
-                          <p className="text-xs font-semibold text-gray-700">
-                            {(item.petani_id?.profil_lahan?.luas_lahan_ha || 0.3) > 0.5 ? 'Layak Pendanaan Mandiri' : 'Layak (Penjaminan Kolektif KUD)'}
-                          </p>
+
+                        <div className="mt-2 p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl w-full max-w-sm">
+                          <div className="flex justify-between text-xs sm:text-sm mb-1.5">
+                            <span className="text-gray-500 font-medium">Nilai Kontrak (Dari Pabrik):</span>
+                            <span className="font-bold text-gray-800">Rp {item.nilai_kontrak?.toLocaleString('id-ID')}</span>
+                          </div>
+                          <div className="flex justify-between text-xs sm:text-sm border-t border-emerald-100/50 pt-1.5">
+                            <span className="text-emerald-700 font-bold">Biaya Layanan & Penjaminan Risiko (1.5%):</span>
+                            <span className="font-black text-emerald-600">+ Rp {((item.nilai_kontrak || 0) * 0.015).toLocaleString('id-ID')}</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* REVENUE STREAM KUD */}
-                      <div className="mt-2 p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl w-full max-w-sm">
-                        <div className="flex justify-between text-xs sm:text-sm mb-1.5">
-                          <span className="text-gray-500 font-medium">Nilai Kontrak (Dari Pabrik):</span>
-                          <span className="font-bold text-gray-800">Rp {item.nilai_kontrak?.toLocaleString('id-ID')}</span>
-                        </div>
-                        <div className="flex justify-between text-xs sm:text-sm border-t border-emerald-100/50 pt-1.5">
-                          <span className="text-emerald-700 font-bold">Biaya Layanan & Penjaminan Risiko (1.5%):</span>
-                          <span className="font-black text-emerald-600">+ Rp {((item.nilai_kontrak || 0) * 0.015).toLocaleString('id-ID')}</span>
-                        </div>
+                      <div className="flex-shrink-0 w-full md:w-auto mt-4 md:mt-0">
+                        {item.status === 'pending' ? (
+                          <button 
+                            // 🛡️ PERBAIKAN: Melemparkan seluruh objek item.petani_id
+                            onClick={() => handleVerifikasi(item._id, item.petani_id)}
+                            className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20"
+                          >
+                            <Satellite size={18} /> Verifikasi Satelit
+                          </button>
+                        ) : item.status === 'verifikasi_lahan' ? (
+                          <div className="w-full md:w-auto flex items-center justify-center gap-2 text-yellow-600 font-bold text-sm bg-yellow-50 px-5 py-3 rounded-xl border border-yellow-200">
+                            <Clock size={18} /> Menunggu DP Pabrik
+                          </div>
+                        ) : (
+                          <div className="w-full md:w-auto flex items-center justify-center gap-2 text-emerald-600 font-bold text-sm bg-emerald-50 px-5 py-3 rounded-xl border border-emerald-100">
+                            <CheckCircle2 size={18} /> Dana Tervalidasi
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* LOGIKA TOMBOL STATE MACHINE ESCROW */}
-                    <div className="flex-shrink-0 w-full md:w-auto mt-4 md:mt-0">
-                      {item.status === 'pending' ? (
-                        <button 
-                          onClick={() => handleVerifikasi(item._id, item.petani_id?._id)}
-                          className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20"
-                        >
-                          <Satellite size={18} /> Verifikasi Satelit
-                        </button>
-                      ) : item.status === 'verifikasi_lahan' ? (
-                        <div className="w-full md:w-auto flex items-center justify-center gap-2 text-yellow-600 font-bold text-sm bg-yellow-50 px-5 py-3 rounded-xl border border-yellow-200">
-                          <Clock size={18} /> Menunggu DP Pabrik
+                    {/* 🌟 3. BAGIAN BAWAH: PETA SPASIAL INTEGRASI */}
+                    {item.petani_id?.koordinat_lokasi && (
+                      <div className="mt-2 pt-5 border-t border-gray-100 w-full animate-fade-in">
+                        <p className="text-xs font-bold text-gray-500 mb-3 flex items-center gap-2">
+                          <Map size={14} className="text-emerald-600" />
+                          VALIDASI SPASIAL BBOX (SENTINEL-2) LOKASI PETANI
+                        </p>
+                        <div className="w-full rounded-xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50">
+                          <KudMapPanel 
+                            koordinat={item.petani_id.koordinat_lokasi} 
+                            namaPetani={item.petani_id.nama}
+                            luasHa={item.tonase / 5} 
+                            ndviScore={item.petani_id.profil_lahan?.ndvi_score || 0.78}
+                          />
                         </div>
-                      ) : (
-                        <div className="w-full md:w-auto flex items-center justify-center gap-2 text-emerald-600 font-bold text-sm bg-emerald-50 px-5 py-3 rounded-xl border border-emerald-100">
-                          <CheckCircle2 size={18} /> Dana Tervalidasi
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
                   </div>
                 ))
@@ -224,9 +245,7 @@ export default function KudDashboard() {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* TAB 3: LOGISTIK (MOCKUP) */}
-        {/* ========================================================= */}
+        {/* TAB 3: LOGISTIK */}
         {activeTab === 'logistik' && (
           <div className="animate-fade-in bg-white p-10 rounded-2xl shadow-sm border border-gray-100 text-center">
              <Truck size={48} className="mx-auto text-gray-300 mb-4" />
