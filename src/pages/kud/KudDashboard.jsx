@@ -29,16 +29,28 @@ export default function KudDashboard() {
     fetchKontrak();
   }, []);
 
-  const handleVerifikasi = async (id) => {
-    const toastId = toast.loading('Memverifikasi satelit lahan...');
+  // Kita butuh ID kontrak Escrow DAN ID Petani untuk ditarik satelitnya
+  const handleVerifikasi = async (escrowId, petaniId) => {
+    const toastId = toast.loading('Menghubungkan ke Satelit ESA Sentinel...', { duration: 5000 });
     try {
-      await axios.put(`${import.meta.env.VITE_API_URL}/escrow/${id}/verify-land`, {}, {
+      // 1. TEMBAK API SATELIT EROPA (Ambil NDVI Riil)
+      const satRes = await axios.post(`${import.meta.env.VITE_API_URL}/satellite/analisis/${petaniId}`, {}, {
         withCredentials: true
       });
-      toast.success('Lahan terverifikasi satelit! Menunggu DP Pabrik.', { id: toastId });
+      const ndviRiil = satRes.data.ndvi;
+      const jenisSatelit = satRes.data.satelit;
+      
+      toast.success(`Scan ${jenisSatelit} Sukses! NDVI: ${ndviRiil}`, { id: toastId, duration: 4000 });
+
+      // 2. SETUJUI KONTRAK DI ESCROW
+      await axios.put(`${import.meta.env.VITE_API_URL}/escrow/${escrowId}/verify-land`, {}, {
+        withCredentials: true
+      });
+      
+      // 3. Refresh Data di Dasbor KUD
       fetchKontrak(); 
     } catch (error) {
-      toast.error(error.response?.data?.pesan || 'Gagal memverifikasi.', { id: toastId });
+      toast.error(error.response?.data?.pesan || 'Satelit gagal memindai lahan.', { id: toastId });
     }
   };
 
@@ -189,7 +201,7 @@ export default function KudDashboard() {
                     <div className="flex-shrink-0 w-full md:w-auto mt-4 md:mt-0">
                       {item.status === 'pending' ? (
                         <button 
-                          onClick={() => handleVerifikasi(item._id)}
+                          onClick={() => handleVerifikasi(item._id, item.petani_id?._id)}
                           className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20"
                         >
                           <Satellite size={18} /> Verifikasi Satelit

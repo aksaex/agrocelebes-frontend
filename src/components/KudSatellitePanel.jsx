@@ -3,7 +3,7 @@ import 'leaflet/dist/leaflet.css';
 import { MapContainer, TileLayer, CircleMarker, useMap } from 'react-leaflet';
 import { Layers3, MapPinned, ScanSearch, User, CheckCircle2, AlertTriangle, ArrowRight, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import axios from 'axios'; // Pastikan Anda sudah menginstal axios (npm install axios)
+import axios from 'axios';
 
 // Komponen helper untuk menggerakkan peta secara dinamis
 function MapUpdater({ center }) {
@@ -45,7 +45,7 @@ export default function KudSatellitePanel() {
           pemilik: petani.nama,
           luas: `${petani.profil_lahan?.luas_lahan_ha || 0} Ha`,
           kordinat: [petani.koordinat_lokasi.lat, petani.koordinat_lokasi.lng],
-          ndvi: 'Tinggi', // Anda bisa buat logik dinamis nanti
+          ndvi: 'Belum Discan', // Akan diupdate oleh API Satelit
           skor: 92,       // Anda bisa buat logik dinamis nanti
           statusLahan: petani.profil_lahan?.status_lahan || 'belum diverifikasi',
         }));
@@ -76,27 +76,38 @@ export default function KudSatellitePanel() {
     fetchPetani();
   }, [API_URL]);
 
-  // 2. FUNGSI UNTUK MENYETUJUI LAHAN (MEMANGGIL BACKEND PUT)
+  // 2. FUNGSI UNTUK MENYETUJUI LAHAN (MEMANGGIL API SATELIT & BACKEND PUT)
   const handleVerifikasi = async () => {
     if (!selectedLahan) return;
     
     setIsVerifying(true);
+    const toastId = toast.loading('Menghubungkan ke API ESA Sentinel...', { duration: 5000 });
+    
     try {
+      // 1. Tarik Data Riil dari Satelit Eropa
+      const satRes = await axios.post(`${API_URL}/satellite/analisis/${selectedLahan.id}`, {}, {
+        withCredentials: true
+      });
+      
+      const ndviRiil = satRes.data.ndvi;
+      const jenisSatelit = satRes.data.satelit;
+      
+      toast.success(`Scan berhasil via ${jenisSatelit}! NDVI: ${ndviRiil}`, { id: toastId, duration: 4000 });
+
+      // 2. Setujui Lahan di Database Escrow (Lanjut ke Pabrik)
       await axios.put(`${API_URL}/user/verifikasi-lahan/${selectedLahan.id}`, {}, {
         withCredentials: true
       });
 
-      toast.success(`Lahan milik ${selectedLahan.pemilik} berhasil disetujui!`);
-      
-      // Update state lokal agar UI langsung berubah tanpa perlu refresh halaman
+      // Update State UI
       const updatedList = petaniList.map(p => 
-        p.id === selectedLahan.id ? { ...p, statusLahan: 'terverifikasi' } : p
+        p.id === selectedLahan.id ? { ...p, statusLahan: 'terverifikasi', ndvi: ndviRiil } : p
       );
       setPetaniList(updatedList);
-      setSelectedLahan({ ...selectedLahan, statusLahan: 'terverifikasi' });
+      setSelectedLahan({ ...selectedLahan, statusLahan: 'terverifikasi', ndvi: ndviRiil });
 
     } catch (error) {
-      toast.error(error.response?.data?.pesan || 'Gagal memverifikasi lahan');
+      toast.error(error.response?.data?.pesan || 'Satelit gagal memindai lahan.', { id: toastId });
     } finally {
       setIsVerifying(false);
     }
@@ -202,8 +213,17 @@ export default function KudSatellitePanel() {
              </div>
 
              <div className="grid grid-cols-2 gap-3 mb-4">
-               <InfoCard title="Kesehatan (NDVI)" value={selectedLahan.ndvi} 
-                 tone={selectedLahan.ndvi === 'Tinggi' ? 'text-emerald-600' : selectedLahan.ndvi === 'Sedang' ? 'text-amber-500' : 'text-red-500'} />
+               {/* Update warna otomatis jika nilai NDVI dari satelit berupa angka riil */}
+               <InfoCard 
+                  title="Kesehatan (NDVI)" 
+                  value={selectedLahan.ndvi} 
+                  tone={
+                    typeof selectedLahan.ndvi === 'number' && selectedLahan.ndvi >= 0.6 ? 'text-emerald-600' : 
+                    typeof selectedLahan.ndvi === 'number' && selectedLahan.ndvi >= 0.4 ? 'text-amber-500' : 
+                    selectedLahan.ndvi === 'Tinggi' ? 'text-emerald-600' : 
+                    'text-gray-800'
+                  } 
+               />
                <InfoCard title="Skor Validasi" value={`${selectedLahan.skor}/100`} tone="text-gray-800" />
              </div>
 

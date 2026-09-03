@@ -311,24 +311,24 @@ export default function PetaniDashboard() {
           </div>
         )}
 
+        {/* TOMBOL PENGAJUAN YANG SUDAH DIBUKA GEMBOKNYA */}
         <button 
-          onClick={handleAjukanPinjaman}
-          disabled={profile?.profil_lahan?.status_lahan !== 'terverifikasi'}
-          className={`w-full py-4 rounded-xl text-sm font-black tracking-wide transition shadow-md flex items-center justify-center gap-2 ${
-            profile?.profil_lahan?.status_lahan === 'terverifikasi'
-              ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-95'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+          onClick={handleAjukanPinjaman} 
+          disabled={!latitude || !longitude} 
+          className={`w-full py-4 rounded-xl text-sm font-black tracking-wide flex items-center justify-center gap-2 transition shadow-md ${
+            (!latitude || !longitude)
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+              : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-95'
           }`}
         >
           <Coins size={18} />
           AJUKAN PINJAMAN AWAL MODAL TANAM
         </button>
         
-        {profile?.profil_lahan?.status_lahan !== 'terverifikasi' && (
-          <p className="text-[10px] text-amber-600 font-bold text-center mt-2">
-            *Tombol pinjaman terkunci hingga koordinat lahan disinkronisasi dan lolos audit status "terverifikasi" oleh satelit KUD.
-          </p>
-        )}
+        <p className="text-[10px] text-gray-500 mt-2 text-center">
+          *Tombol terbuka setelah Anda mengunci GPS. KUD akan memverifikasi kelayakan via Satelit.
+        </p>
+
       </div>
 
     </div>
