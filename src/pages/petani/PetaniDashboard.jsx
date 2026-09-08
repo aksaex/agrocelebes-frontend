@@ -24,6 +24,10 @@ export default function PetaniDashboard() {
   const [pendingGeotag, setPendingGeotag] = useState(null);
   const isSyncingRef = useRef(false);
 
+  // --- STATE JURNAL TANI ---
+  const [jurnalForm, setJurnalForm] = useState({ aktivitas: 'Pemupukan', catatan: '' });
+  const [isSubmittingJurnal, setIsSubmittingJurnal] = useState(false);
+
   // 🌟 LOGIKA BISNIS: Cek apakah ada kontrak aktif (belum selesai)
   const isKontrakAktif = escrowContract && escrowContract.status !== 'selesai';
   const isMusimBaru = escrowContract && escrowContract.status === 'selesai';
@@ -188,6 +192,25 @@ export default function PetaniDashboard() {
       const pesanError = err.response?.data?.pesan || "Gagal mengajukan pinjaman.";
       toast.error(pesanError);
       speakNotification('Maaf, pengajuan pinjaman Anda gagal diproses sistem.');
+    }
+  };
+
+  // 6. SIMPAN JURNAL TANI (GAP)
+  const handleSimpanJurnal = async (e) => {
+    e.preventDefault();
+    if (!escrowContract?._id) return toast.error('Belum ada kontrak aktif.');
+    
+    setIsSubmittingJurnal(true);
+    const tid = toast.loading('Menyimpan log aktivitas ke dalam blockchain...');
+    try {
+      await axios.post(`${import.meta.env.VITE_API_URL}/escrow/${escrowContract._id}/jurnal`, jurnalForm, getAuthConfig());
+      toast.success('Aktivitas berhasil dicatat dan dikunci!', { id: tid });
+      setJurnalForm({ ...jurnalForm, catatan: '' });
+      fetchDashboardData(); // Refresh data untuk memunculkan jurnal terbaru
+    } catch (error) {
+      toast.error('Gagal menyimpan aktivitas harian.', { id: tid });
+    } finally {
+      setIsSubmittingJurnal(false);
     }
   };
 
@@ -404,8 +427,77 @@ export default function PetaniDashboard() {
         <p className="text-[10px] text-gray-500 mt-2 text-center">
           *Tombol terbuka setelah Anda mengunci GPS. KUD akan memverifikasi kelayakan via Satelit.
         </p>
-
       </div>
+
+      {/* BLOCK 3: JURNAL TANI (TRACEABILITY) */}
+      {escrowContract && escrowContract.status !== 'pending' && (
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 animate-fade-in">
+          <div className="flex items-center gap-2 mb-4 text-emerald-800">
+            <CheckCircle size={22} />
+            <h2 className="text-lg font-black tracking-tight">Buku Jurnal Tani (GAP)</h2>
+          </div>
+          <p className="text-xs text-gray-500 mb-5">
+            Catat aktivitas lahan Anda di sini. Data ini akan menjadi portofolio yang diaudit oleh KUD dan Pabrik.
+          </p>
+
+          <form onSubmit={handleSimpanJurnal} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5 block">Jenis Aktivitas</label>
+                <select 
+                  value={jurnalForm.aktivitas}
+                  onChange={(e) => setJurnalForm({...jurnalForm, aktivitas: e.target.value})}
+                  className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-800 focus:outline-emerald-500"
+                >
+                  <option value="Pemupukan">Pemupukan</option>
+                  <option value="Penyemprotan Hama">Penyemprotan Hama</option>
+                  <option value="Pengairan">Pengairan Irigasi</option>
+                  <option value="Penyiangan Gulma">Penyiangan Gulma</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1.5 block">Detail/Catatan Tambahan</label>
+                <input 
+                  type="text" 
+                  required
+                  value={jurnalForm.catatan}
+                  onChange={(e) => setJurnalForm({...jurnalForm, catatan: e.target.value})}
+                  placeholder="Misal: Pakai pupuk Urea 50kg" 
+                  className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:outline-emerald-500"
+                />
+              </div>
+            </div>
+            <button 
+              type="submit" 
+              disabled={isSubmittingJurnal}
+              className="w-full py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition disabled:opacity-50 text-sm shadow-sm"
+            >
+              Simpan ke Portofolio
+            </button>
+          </form>
+
+          {/* DAFTAR RIWAYAT JURNAL */}
+          <div className="space-y-3">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 border-b border-gray-100 pb-2">Riwayat Aktivitas Musim Ini</h3>
+            {escrowContract.jurnal_tani?.length === 0 ? (
+              <p className="text-xs text-gray-400 italic text-center py-4">Belum ada catatan aktivitas.</p>
+            ) : (
+              escrowContract.jurnal_tani?.slice().reverse().map((jurnal, idx) => (
+                <div key={idx} className="flex items-start justify-between p-3 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition">
+                  <div>
+                    <p className="text-sm font-bold text-gray-800">{jurnal.aktivitas}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{jurnal.catatan}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{new Date(jurnal.tanggal).toLocaleString('id-ID')}</p>
+                  </div>
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md border ${jurnal.diverifikasi_kud ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                    {jurnal.diverifikasi_kud ? 'Terverifikasi' : 'Menunggu KUD'}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
     </div>
   );
