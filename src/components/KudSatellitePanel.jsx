@@ -30,7 +30,7 @@ export default function KudSatellitePanel() {
     const fetchPetani = async () => {
       try {
         const response = await axios.get(`${API_URL}/user/petani-list`, {
-          withCredentials: true, // WAJIB untuk mengirim cookie token JWT
+          withCredentials: true,
         });
 
         // Filter hanya petani yang SUDAH memiliki koordinat lokasi
@@ -38,24 +38,24 @@ export default function KudSatellitePanel() {
           (p) => p.koordinat_lokasi && p.koordinat_lokasi.lat && p.koordinat_lokasi.lng
         );
 
-        // Format data MongoDB agar sesuai dengan kebutuhan UI Map
+        // Format data MongoDB agar sesuai dengan kebutuhan UI Map & Gambar Satelit
         const formattedData = validPetani.map((petani) => ({
           id: petani._id,
           nama: petani.nama_perusahaan || 'Lahan Pribadi',
           pemilik: petani.nama,
           luas: `${petani.profil_lahan?.luas_lahan_ha || 0} Ha`,
           kordinat: [petani.koordinat_lokasi.lat, petani.koordinat_lokasi.lng],
-          ndvi: 'Belum Discan', // Akan diupdate oleh API Satelit
-          skor: 92,       // Anda bisa buat logik dinamis nanti
+          ndvi: petani.profil_lahan?.ndvi_score || 'Belum Discan',
+          skor: petani.profil_lahan?.agro_score_final || 92,
           statusLahan: petani.profil_lahan?.status_lahan || 'belum diverifikasi',
+          gambarSawah: petani.profil_lahan?.gambar_sawah || null,
         }));
 
         setPetaniList(formattedData);
         if (formattedData.length > 0) {
-          setSelectedLahan(formattedData[0]); // Default pilih lahan pertama
+          setSelectedLahan(formattedData[0]);
         }
       } catch (error) {
-        // TAMPILKAN DETAIL ERROR KE CONSOLE & LAYAR
         console.error('Detail Error API:', error.response || error);
         
         const pesanBackend = error.response?.data?.pesan;
@@ -76,7 +76,7 @@ export default function KudSatellitePanel() {
     fetchPetani();
   }, [API_URL]);
 
-  // 2. FUNGSI UNTUK MENYETUJUI LAHAN (MEMANGGIL API SATELIT & BACKEND PUT)
+  // 2. FUNGSI UNTUK MENYETUJUI LAHAN
   const handleVerifikasi = async () => {
     if (!selectedLahan) return;
     
@@ -84,27 +84,28 @@ export default function KudSatellitePanel() {
     const toastId = toast.loading('Menghubungkan ke API ESA Sentinel...', { duration: 5000 });
     
     try {
-      // 1. Tarik Data Riil dari Satelit Eropa
+      // 1. Tarik Data Riil dari Satelit GEE
       const satRes = await axios.post(`${API_URL}/satellite/analisis/${selectedLahan.id}`, {}, {
         withCredentials: true
       });
       
       const ndviRiil = satRes.data.ndvi;
       const jenisSatelit = satRes.data.satelit;
+      const urlGambar = satRes.data.gambar_sawah;
       
       toast.success(`Scan berhasil via ${jenisSatelit}! NDVI: ${ndviRiil}`, { id: toastId, duration: 4000 });
 
-      // 2. Setujui Lahan di Database Escrow (Lanjut ke Pabrik)
+      // 2. Setujui Lahan di Database
       await axios.put(`${API_URL}/user/verifikasi-lahan/${selectedLahan.id}`, {}, {
         withCredentials: true
       });
 
-      // Update State UI
+      // Update State UI beserta URL Gambar Baru
       const updatedList = petaniList.map(p => 
-        p.id === selectedLahan.id ? { ...p, statusLahan: 'terverifikasi', ndvi: ndviRiil } : p
+        p.id === selectedLahan.id ? { ...p, statusLahan: 'terverifikasi', ndvi: ndviRiil, gambarSawah: urlGambar } : p
       );
       setPetaniList(updatedList);
-      setSelectedLahan({ ...selectedLahan, statusLahan: 'terverifikasi', ndvi: ndviRiil });
+      setSelectedLahan({ ...selectedLahan, statusLahan: 'terverifikasi', ndvi: ndviRiil, gambarSawah: urlGambar });
 
     } catch (error) {
       toast.error(error.response?.data?.pesan || 'Satelit gagal memindai lahan.', { id: toastId });
@@ -213,7 +214,6 @@ export default function KudSatellitePanel() {
              </div>
 
              <div className="grid grid-cols-2 gap-3 mb-4">
-               {/* Update warna otomatis jika nilai NDVI dari satelit berupa angka riil */}
                <InfoCard 
                   title="Kesehatan (NDVI)" 
                   value={selectedLahan.ndvi} 
@@ -225,6 +225,25 @@ export default function KudSatellitePanel() {
                   } 
                />
                <InfoCard title="Skor Validasi" value={`${selectedLahan.skor}/100`} tone="text-gray-800" />
+             </div>
+
+             {/* PANEL PRATINJAU GAMBAR SATELIT GEE */}
+             <div className="mb-4">
+               <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2">Citra Sentinel-2 (GEE)</p>
+               <div className="w-full h-32 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 relative">
+                 {selectedLahan.gambarSawah ? (
+                   <img 
+                     src={selectedLahan.gambarSawah} 
+                     alt="Citra Satelit GEE" 
+                     className="w-full h-full object-cover"
+                   />
+                 ) : (
+                   <div className="w-full h-full flex flex-col items-center justify-center text-emerald-600 bg-emerald-500/10 p-2 text-center">
+                     <span className="font-bold text-xs">Menunggu Data GEE</span>
+                     <span className="text-[10px] opacity-70">Klik setujui untuk memindai</span>
+                   </div>
+                 )}
+               </div>
              </div>
 
              {selectedLahan.statusLahan === 'terverifikasi' ? (

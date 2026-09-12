@@ -233,6 +233,7 @@ export default function KudDashboard() {
                             namaPetani={item.petani_id.nama}
                             luasHa={item.tonase / 5} 
                             ndviScore={item.petani_id.profil_lahan?.ndvi_score || 0.78}
+                            gambarSawah={item.petani_id.profil_lahan?.gambar_sawah} 
                           />
                         </div>
                       </div>
